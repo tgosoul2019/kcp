@@ -41,6 +41,15 @@ KCP defines a protocol for **knowledge artifacts** — signed, content-addressed
 5. **Zero infrastructure** — Works locally with no server, no config, no accounts
 6. **Transparent to users** — AI assistant skills abstract all complexity
 
+## SDK Status
+
+| SDK | Language | Tests | Status |
+|-----|----------|-------|--------|
+| Python | Python 3.13 · pytest | ✅ **61 tests** | Production-ready |
+| TypeScript | Node.js 25 · Jest | ✅ **37 tests** | Production-ready |
+| Go | Go 1.22 · go test | ✅ **64 tests** | Production-ready |
+| **Total** | | ✅ **162 tests** | All passing |
+
 ## Quick Start
 
 ### Install
@@ -150,7 +159,7 @@ kcp/
 │   │   │   └── ui/
 │   │   │       └── index.html # Web UI (single-file)
 │   │   └── pyproject.toml
-│   ├── go/                    # Go SDK (implemented)
+│   ├── go/                    # Go SDK (Go 1.22, 64 tests ✅)
 │   │   ├── cmd/kcp/main.go    # CLI entrypoint
 │   │   ├── pkg/crypto/        # Crypto (Ed25519 + SHA-256)
 │   │   ├── pkg/models/        # Data models

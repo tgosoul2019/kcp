@@ -29,11 +29,12 @@
 - **KCPNode**: embedded in-process node (no server required for local mode)
 - **Genesis Block**: GENESIS.json — cryptographic anchor of the protocol
 
-## SDKs (all implemented)
+## SDKs (all implemented, all tested)
 
-- Python 3.13: sdk/python/
-- TypeScript (Node.js 25): sdk/typescript/
-- Go 1.22: sdk/go/
+- Python 3.13: sdk/python/ — **61 tests ✅**
+- TypeScript (Node.js 25): sdk/typescript/ — **37 tests ✅**
+- Go 1.22: sdk/go/ — **64 tests ✅**
+- **Total: 162 tests passing**
 
 ## Documentation Index
 

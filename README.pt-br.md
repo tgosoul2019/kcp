@@ -125,20 +125,28 @@ Resposta:
 - **[Casos de Uso](docs/use-cases.md)** — 10 cenários reais
 - **[Roadmap](docs/roadmap.md)** — Plano de desenvolvimento em 6 fases
 - **[Apresentação Executiva](docs/presentation.html)** — Slides interativos (PT-BR)
-- **[Python SDK](sdk/python/README.md)** — SDK Python (referência)
-- **[Go SDK](sdk/go/README.md)** — SDK Go (implementado)
-- **[TypeScript SDK](sdk/typescript/README.md)** — SDK TypeScript (implementado)
+- **[Python SDK](sdk/python/README.md)** — SDK Python (referência · **61 testes ✅**)
+- **[Go SDK](sdk/go/README.md)** — SDK Go (**64 testes ✅**)
+- **[TypeScript SDK](sdk/typescript/README.md)** — SDK TypeScript (**37 testes ✅**)
 - **[Contributing](CONTRIBUTING.md)** — Como contribuir
 
 ---
 
 ## 🛠️ Implementação de Referência
 
+**162 testes passando em 3 SDKs:**
+
+| SDK | Linguagem | Testes | Status |
+|-----|-----------|--------|--------|
+| Python | Python 3.13 · pytest | ✅ **61 testes** | Pronto para produção |
+| TypeScript | Node.js 25 · Jest | ✅ **37 testes** | Pronto para produção |
+| Go | Go 1.22 · go test | ✅ **64 testes** | Pronto para produção |
+
 SDKs disponíveis em:
 
-- **[Python](sdk/python/)** — Cliente de referência (implementado)
-- **[Go](sdk/go/)** — Implementação de alta performance (implementado)
-- **[TypeScript](sdk/typescript/)** — Suporte Node.js + browser (implementado)
+- **[Python](sdk/python/)** — Cliente de referência (SQLite + FTS5, Ed25519)
+- **[Go](sdk/go/)** — Alta performance (go-sqlite3, Ed25519)
+- **[TypeScript](sdk/typescript/)** — Node.js + @noble/ed25519 (zero deps nativos)
 
 ---
 
@@ -171,17 +179,20 @@ Impacto real medido em adoções iniciais:
 
 ## 🗺️ Roadmap
 
-### Fase 1: MVP (Semanas 1-4) ✅ Em Andamento
-- [x] Especificação do protocolo v0.1
-- [x] Implementação de referência (Python)
-- [ ] Backend de storage libsql + SQLCipher
-- [ ] Piloto com 10 usuários
+### Fase 1: MVP ✅ Concluído
+- [x] Especificação do protocolo v0.2
+- [x] Python SDK — **61 testes ✅**
+- [x] TypeScript SDK — **37 testes ✅**
+- [x] Go SDK — **64 testes ✅**
+- [x] **Total: 162 testes passando**
+- [x] Org GitHub `kcp-protocol`
+- [x] Landing page `kcp-protocol.org`
 
 ### Fase 2: Escala (Meses 2-4)
+- [ ] MCP Wrapper Server (Claude, Cursor, Windsurf)
 - [ ] Integração com Vector DB (busca semântica)
-- [ ] RBAC multi-tenant
-- [ ] SDKs TypeScript ✅ Go ✅
-- [ ] 100 usuários
+- [ ] SDKs Rust, Java, Kotlin
+- [ ] 100 early adopters
 
 ### Fase 3: Padronização (Meses 4-6)
 - [ ] Backend P2P com IPFS + libp2p

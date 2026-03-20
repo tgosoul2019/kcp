@@ -34,7 +34,13 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
   - [x] KCPNode (publish, get, search, verify, lineage, stats)
   - [x] Ed25519 + SHA-256 via @noble/* (zero native deps)
   - [x] JSON file storage backend
-- [x] Go SDK (store, node, crypto, CLI — implemented ✅)
+- [x] Go SDK — Go 1.22, SQLite, Ed25519 (**64 tests ✅**)
+  - [x] KCPNode (publish, get, search, list, lineage, delete, stats)
+  - [x] Ed25519 signing & verification (pkg/crypto)
+  - [x] Data models (pkg/models)
+  - [x] SQLite storage backend (pkg/store)
+  - [x] CLI entrypoint (cmd/kcp)
+- [x] **Total: 162 tests passing** (Python 61 + TypeScript 37 + Go 64)
 - [x] RFC (kcp-001-core.md + RFC-001-CORE.md)
 - [x] Whitepaper
 - [x] Executive presentation
@@ -46,7 +52,44 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
 
 ---
 
-## Phase 1: Shared Storage Transports (v0.3) 🔜
+## Phase 1: MCP Wrapper + Ecosystem SDKs (v0.3) 🔜
+
+**Goal:** Make KCP usable from AI assistants (Claude, Cursor, Windsurf) and expand language coverage.
+
+### MCP Wrapper Server
+
+Expose KCP as a Model Context Protocol server so AI assistants can call it directly:
+
+```
+Claude / Cursor / Windsurf
+      ↓ MCP protocol
+  KCP MCP Server (Python)
+      ↓ KCPNode API
+    SQLite (local)
+```
+
+**Tools exposed:**
+- `kcp_publish` — publish a knowledge artifact
+- `kcp_search` — semantic search across artifacts
+- `kcp_get` — retrieve artifact by ID
+- `kcp_lineage` — trace lineage chain
+
+**Tasks:**
+- [ ] `mcp-server/` Python package with FastAPI + MCP protocol
+- [ ] `kcp_publish`, `kcp_search`, `kcp_get`, `kcp_lineage` tools
+- [ ] Claude Desktop config (`claude_desktop_config.json`)
+- [ ] Cursor / Windsurf integration guide
+- [ ] Docker image (`kcp-mcp-server`)
+
+### New SDKs
+
+- [ ] **Rust SDK** (`sdk/rust/`) — `ed25519-dalek`, `sha2`, `serde_json`, `rusqlite`
+- [ ] **Java SDK** (`sdk/java/`) — Bouncy Castle, SQLite JDBC, Jackson
+- [ ] **Kotlin/Mobile SDK** (`sdk/kotlin/`) — Android-compatible, Coroutines
+
+---
+
+## Phase 2: Shared Storage Transports (v0.4) 🔜
 
 **Goal:** Enable real-time sharing between users without a dedicated server.
 
