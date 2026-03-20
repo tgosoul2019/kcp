@@ -237,7 +237,7 @@ Se usar o KCP em trabalhos acadêmicos, cite:
   title = {Knowledge Context Protocol: A New Architectural Layer for AI-Generated Knowledge Governance},
   year = {2026},
   publisher = {GitHub},
-  url = {https://github.com/tgosoul2019/kcp}
+  url = {https://github.com/kcp-protocol/kcp}
 }
 ```
 

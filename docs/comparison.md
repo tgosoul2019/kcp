@@ -163,4 +163,4 @@ AI Agent → KCP (persistent knowledge) → Knowledge Store
 
 ---
 
-**Feedback:** https://github.com/tgosoul2019/kcp/issues
+**Feedback:** https://github.com/kcp-protocol/kcp/issues

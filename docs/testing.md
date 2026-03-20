@@ -243,7 +243,7 @@ package crypto_test
 
 import (
     "testing"
-    "github.com/tgosoul2019/kcp/pkg/crypto"
+    "github.com/kcp-protocol/kcp/pkg/crypto"
 )
 
 func TestHashContent(t *testing.T) {
@@ -280,7 +280,7 @@ Which runs `make test-python`, `make test-ts`, and `make test-go` in sequence.
 Tests: 37 passed ✓
 
 → Running Go tests...
-ok  github.com/tgosoul2019/kcp/pkg/... ✓
+ok  github.com/kcp-protocol/kcp/pkg/... ✓
 ```
 
 ---

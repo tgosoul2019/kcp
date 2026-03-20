@@ -193,4 +193,4 @@ Data sources match. Reuse? [Yes/No]"
 
 ---
 
-**Have a use case we missed?** Open an issue: https://github.com/tgosoul2019/kcp/issues
+**Have a use case we missed?** Open an issue: https://github.com/kcp-protocol/kcp/issues

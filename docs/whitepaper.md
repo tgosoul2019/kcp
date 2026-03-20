@@ -310,4 +310,4 @@ KCP is not a product — it is a **protocol**. Any organization can implement it
 
 ---
 
-**Feedback welcome:** https://github.com/tgosoul2019/kcp/issues
+**Feedback welcome:** https://github.com/kcp-protocol/kcp/issues

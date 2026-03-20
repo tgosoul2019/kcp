@@ -157,7 +157,7 @@ EC2 (t3.small, $15/mo)
 
 - [ ] PyPI package (`pip install kcp`)
 - [ ] npm package (`npm install @kcp/client`)
-- [ ] Go module (`go get github.com/tgosoul2019/kcp`)
+- [ ] Go module (`go get github.com/kcp-protocol/kcp`)
 - [ ] VS Code extension
 - [ ] GitHub Action (publish artifacts from CI/CD)
 - [ ] Helm chart for Kubernetes deployment

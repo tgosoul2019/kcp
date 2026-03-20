@@ -58,10 +58,10 @@ all = [
 kcp = "kcp.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/tgosoul2019/kcp"
-Documentation = "https://github.com/tgosoul2019/kcp/blob/main/SPEC.md"
-Repository = "https://github.com/tgosoul2019/kcp"
-Issues = "https://github.com/tgosoul2019/kcp/issues"
+Homepage = "https://github.com/kcp-protocol/kcp"
+Documentation = "https://github.com/kcp-protocol/kcp/blob/main/SPEC.md"
+Repository = "https://github.com/kcp-protocol/kcp"
+Issues = "https://github.com/kcp-protocol/kcp/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

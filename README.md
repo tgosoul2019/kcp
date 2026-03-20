@@ -191,4 +191,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions welcome — code, docs
 
 **Author:** [Thiago Silva](https://github.com/tgosoul2019)  
 **Status:** Alpha — protocol and SDK under active development  
-**Feedback:** [Open an issue](https://github.com/tgosoul2019/kcp/issues)
+**Feedback:** [Open an issue](https://github.com/kcp-protocol/kcp/issues)

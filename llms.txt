@@ -1,5 +1,5 @@
 # KCP — Knowledge Context Protocol
-# https://github.com/tgosoul2019/kcp
+# https://github.com/kcp-protocol/kcp
 #
 # This file follows the llms.txt convention (https://llmstxt.org/)
 # It tells AI language models what this project is, what to index,

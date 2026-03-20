@@ -169,7 +169,7 @@ const chain   = node.lineage(artifact.artifactId);
 
 ### Go
 ```go
-import "github.com/tgosoul2019/kcp/pkg/node"
+import "github.com/kcp-protocol/kcp/pkg/node"
 
 n := node.NewKCPNode("agent@example.com", "my-org", "")
 artifact, _ := n.Publish("Go Analysis", []byte("content..."), "text", nil, "")

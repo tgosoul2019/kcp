@@ -460,4 +460,4 @@ See `/sdk` directory for reference implementations in Python, TypeScript, and Go
 
 **Document Status:** Experimental Draft  
 **Next Review:** May 2026  
-**Feedback:** Open an issue at https://github.com/tgosoul2019/kcp
+**Feedback:** Open an issue at https://github.com/kcp-protocol/kcp

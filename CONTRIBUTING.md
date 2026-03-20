@@ -29,7 +29,7 @@ The most valuable contribution right now is **feedback on the protocol design**:
 
 ```bash
 # Clone the repo
-git clone https://github.com/tgosoul2019/kcp.git
+git clone https://github.com/kcp-protocol/kcp.git
 cd kcp
 
 # Python SDK — isolated virtual environment (Python 3.13)

@@ -5,7 +5,7 @@ Go implementation of the Knowledge Context Protocol.
 ## Install
 
 ```bash
-go install github.com/tgosoul2019/kcp/sdk/go/cmd/kcp@latest
+go install github.com/kcp-protocol/kcp/sdk/go/cmd/kcp@latest
 ```
 
 ## Build from source
@@ -53,7 +53,7 @@ package main
 
 import (
     "fmt"
-    "github.com/tgosoul2019/kcp/sdk/go/pkg/node"
+    "github.com/kcp-protocol/kcp/sdk/go/pkg/node"
 )
 
 func main() {

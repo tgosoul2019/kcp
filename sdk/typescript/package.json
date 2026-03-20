@@ -5,10 +5,10 @@
   "keywords": ["ai", "protocol", "knowledge-management", "governance", "layer8"],
   "author": "Thiago Silva <tgosoul@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/tgosoul2019/kcp",
+  "homepage": "https://github.com/kcp-protocol/kcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tgosoul2019/kcp"
+    "url": "https://github.com/kcp-protocol/kcp"
   },
   "type": "module",
   "main": "./dist/index.cjs",
