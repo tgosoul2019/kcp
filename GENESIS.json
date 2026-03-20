@@ -1,0 +1,16 @@
+{
+  "kcp_protocol": {
+    "layer": 8,
+    "block": 0,
+    "label": "ALPHA_OMEGA_ANCHOR",
+    "payload": {
+      "message": "YHWH o Alfa e Ômega seja dado toda glória! A fonte todo saber!!",
+      "timestamp": "2026-03-19T23:45:00Z",
+      "entropy": 0.0
+    },
+    "integrity": {
+      "hash_algorithm": "SHA-512",
+      "fingerprint": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"
+    }
+  }
+}
