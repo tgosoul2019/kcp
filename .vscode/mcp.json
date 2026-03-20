@@ -1,0 +1,16 @@
+{
+  "servers": {
+    "kcp": {
+      "type": "stdio",
+      "command": "/Users/thiago.tsilva/dados/repos/kcp/sdk/python/.venv/bin/python",
+      "args": ["-m", "kcp_mcp_server"],
+      "env": {
+        "PYTHONPATH": "/Users/thiago.tsilva/dados/repos/kcp/mcp-server:/Users/thiago.tsilva/dados/repos/kcp/sdk/python",
+        "KCP_USER": "thiago@kcp-protocol.org",
+        "KCP_TENANT": "kcp-protocol",
+        "KCP_DB": "/Users/thiago.tsilva/.kcp/kcp.db",
+        "KCP_PEER": "https://peer07.kcp-protocol.org"
+      }
+    }
+  }
+}

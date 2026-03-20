@@ -1,7 +1,13 @@
 """
 KCP Cryptographic Operations
 
-Ed25519 signing and verification + SHA-256 content hashing.
+Ed25519 signing + SHA-256 hashing + AES-256-GCM content encryption.
+
+Encryption model:
+  - Content key derived from Ed25519 private key via HKDF-SHA256
+  - AES-256-GCM with random 12-byte nonce (prepended to ciphertext)
+  - Only artifacts with visibility="private" are encrypted at rest
+  - Public artifacts are stored as plaintext (discoverable by design)
 """
 
 from __future__ import annotations
@@ -110,3 +116,90 @@ def hash_content(content: bytes) -> str:
         Lowercase hex-encoded SHA-256 hash
     """
     return hashlib.sha256(content).hexdigest()
+
+
+# ─── AES-256-GCM Content Encryption ───────────────────────────
+
+_ENCRYPTION_MAGIC = b"KCPENC1"  # 7-byte magic prefix — marks encrypted blobs
+
+
+def derive_content_key(private_key: bytes, artifact_id: str) -> bytes:
+    """
+    Derive a 256-bit AES key from the Ed25519 private key + artifact ID.
+
+    Uses HKDF-SHA256 so each artifact gets a unique key even from the
+    same private key. The artifact ID is the HKDF info parameter.
+
+    Args:
+        private_key: Ed25519 private key bytes (32 bytes)
+        artifact_id: UUID string of the artifact
+
+    Returns:
+        32-byte AES-256 key
+    """
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives import hashes
+
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=f"kcp-content-key:{artifact_id}".encode(),
+    )
+    return hkdf.derive(private_key)
+
+
+def encrypt_content(content: bytes, key: bytes) -> bytes:
+    """
+    Encrypt content with AES-256-GCM.
+
+    Wire format:
+        KCPENC1 (7 bytes) | nonce (12 bytes) | ciphertext+tag (N+16 bytes)
+
+    Args:
+        content: Plaintext bytes
+        key: 32-byte AES-256 key (from derive_content_key)
+
+    Returns:
+        Encrypted blob with magic prefix
+    """
+    import os
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = os.urandom(12)
+    aesgcm = AESGCM(key)
+    ciphertext = aesgcm.encrypt(nonce, content, None)  # no AAD
+    return _ENCRYPTION_MAGIC + nonce + ciphertext
+
+
+def decrypt_content(blob: bytes, key: bytes) -> bytes:
+    """
+    Decrypt an AES-256-GCM encrypted blob.
+
+    Args:
+        blob: Encrypted blob (with KCPENC1 magic prefix)
+        key: 32-byte AES-256 key (from derive_content_key)
+
+    Returns:
+        Plaintext bytes
+
+    Raises:
+        ValueError: If blob is not a valid KCP encrypted blob
+        cryptography.exceptions.InvalidTag: If decryption fails (tampered)
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    magic_len = len(_ENCRYPTION_MAGIC)
+    if not blob[:magic_len] == _ENCRYPTION_MAGIC:
+        raise ValueError("Not a KCP encrypted blob (missing KCPENC1 magic)")
+
+    nonce = blob[magic_len: magic_len + 12]
+    ciphertext = blob[magic_len + 12:]
+
+    aesgcm = AESGCM(key)
+    return aesgcm.decrypt(nonce, ciphertext, None)
+
+
+def is_encrypted(blob: bytes) -> bool:
+    """Return True if the blob was encrypted by KCP."""
+    return blob[:len(_ENCRYPTION_MAGIC)] == _ENCRYPTION_MAGIC

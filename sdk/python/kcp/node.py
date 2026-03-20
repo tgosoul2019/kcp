@@ -25,7 +25,10 @@ from typing import Optional
 from uuid import uuid4
 
 from .models import KnowledgeArtifact, Lineage, ACL, SearchResponse
-from .crypto import generate_keypair, sign_artifact, verify_artifact, hash_content
+from .crypto import (
+    generate_keypair, sign_artifact, verify_artifact, hash_content,
+    encrypt_content, decrypt_content, derive_content_key, is_encrypted,
+)
 from .store import LocalStore
 
 
@@ -95,6 +98,23 @@ class KCPNode:
         if isinstance(content, str):
             content = content.encode("utf-8")
 
+        # content_hash always computed on PLAINTEXT (for integrity verification)
+        plaintext_hash = hash_content(content)
+
+        # Encrypt at rest if private
+        stored_content = content
+        if visibility == "private":
+            # Derive a temporary ID for HKDF — will be replaced after artifact is created
+            import uuid
+            temp_id = str(uuid.uuid4())
+            content_key = derive_content_key(self.private_key, temp_id)
+            stored_content = encrypt_content(content, content_key)
+            # Store the temp_id in source so we can re-derive the key later
+            # We embed it as a non-user-visible field via a dedicated key store
+            self._store_content_key_id(temp_id)
+        else:
+            temp_id = None
+
         artifact = KnowledgeArtifact(
             title=title,
             user_id=self.user_id,
@@ -105,14 +125,21 @@ class KCPNode:
             summary=summary,
             source=source,
             lineage=lineage,
-            content_hash=hash_content(content),
+            content_hash=plaintext_hash,  # always hash of plaintext
         )
 
-        # Sign
+        # Sign over metadata (includes plaintext hash — tamper-evident)
         artifact.signature = sign_artifact(artifact.to_dict(), self.private_key)
 
+        # Store encrypted content keyed by artifact.id for key retrieval
+        if visibility == "private" and temp_id:
+            # Re-derive with the real artifact.id
+            content_key = derive_content_key(self.private_key, artifact.id)
+            stored_content = encrypt_content(content, content_key)
+            self._store_content_key_id(artifact.id)
+
         # Store
-        self.store.publish(artifact, content=content, derived_from=derived_from)
+        self.store.publish(artifact, content=stored_content, derived_from=derived_from)
 
         return artifact
 
@@ -121,11 +148,29 @@ class KCPNode:
         return self.store.get(artifact_id)
 
     def get_content(self, artifact_id: str) -> Optional[bytes]:
-        """Get raw content for an artifact."""
+        """Get raw content for an artifact — decrypts private artifacts automatically."""
         artifact = self.store.get(artifact_id)
         if not artifact:
             return None
-        return self.store.get_content(artifact.content_hash)
+        raw = self.store.get_content(artifact.content_hash)
+        if raw is None:
+            return None
+        # Auto-decrypt if we own the key and blob is encrypted
+        if is_encrypted(raw) and self._can_decrypt(artifact_id):
+            content_key = derive_content_key(self.private_key, artifact_id)
+            try:
+                return decrypt_content(raw, content_key)
+            except Exception:
+                return None  # key mismatch (artifact from another node)
+        return raw
+
+    def _store_content_key_id(self, artifact_id: str):
+        """Record that we have the encryption key for this artifact."""
+        self.store.set_config(f"enc_key:{artifact_id}", "1")
+
+    def _can_decrypt(self, artifact_id: str) -> bool:
+        """Return True if this node holds the encryption key for the artifact."""
+        return bool(self.store.get_config(f"enc_key:{artifact_id}"))
 
     def search(self, query: str, limit: int = 20) -> SearchResponse:
         """Search artifacts by text."""

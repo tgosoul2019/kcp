@@ -275,6 +275,20 @@ async def _kcp_publish(node: KCPNode, args: dict) -> list[types.TextContent]:
         "kcp_uri": f"kcp://local/artifact/{artifact.id}",
         "message": f"✅ Artifact published and signed. ID: {artifact.id}",
     }
+
+    # Auto-sync to peer if KCP_PEER env is set (only public artifacts)
+    peer_url = os.environ.get("KCP_PEER", "").strip()
+    if peer_url and artifact.visibility == "public":
+        try:
+            sync_result = node.sync_push(peer_url)
+            result["peer_sync"] = {
+                "peer": peer_url,
+                "pushed": sync_result.get("pushed", 0),
+                "status": "✅ synced" if sync_result.get("pushed", 0) > 0 else "⚠️ already up-to-date",
+            }
+        except Exception as e:
+            result["peer_sync"] = {"peer": peer_url, "status": f"⚠️ sync failed: {e}"}
+
     return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
