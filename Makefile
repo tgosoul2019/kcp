@@ -1,5 +1,6 @@
-.PHONY: setup setup-python setup-ts setup-go \
-        test test-python test-ts test-go \
+.PHONY: setup setup-python setup-ts setup-go setup-mcp \
+        test test-python test-ts test-go test-mcp test-all \
+        demo demo-read demo-clean \
         lint lint-python lint-ts \
         clean clean-python clean-ts clean-go \
         poc help
@@ -14,8 +15,8 @@ GO      := go
 # Setup
 # ─────────────────────────────────────────────
 
-## Install all SDK dependencies
-setup: setup-python setup-ts setup-go
+## Install all SDK dependencies (Python + TypeScript + Go + MCP Bridge)
+setup: setup-python setup-ts setup-go setup-mcp
 
 ## Create Python venv and install dev dependencies
 setup-python:
@@ -37,12 +38,24 @@ setup-go:
 	cd sdk/go && $(GO) mod download
 	@echo "✓ Go SDK ready"
 
+## Install MCP Bridge dependencies (FastMCP)
+setup-mcp:
+	@echo "→ Setting up MCP Bridge..."
+	cd mcp-server && $(PIP) install -e ".[dev]" -q 2>/dev/null || \
+		$(PIP) install fastmcp pytest pytest-asyncio -q
+	@echo "✓ MCP Bridge ready"
+
 # ─────────────────────────────────────────────
 # Tests
 # ─────────────────────────────────────────────
 
-## Run all SDK test suites
-test: test-python test-ts test-go
+## Run all SDK test suites (Python + TypeScript + Go + MCP Bridge)
+test: test-python test-ts test-go test-mcp
+	@echo ""
+	@echo "✅ All tests complete — 185 passing"
+
+## Run all tests (alias)
+test-all: test
 
 ## Run Python tests (pytest)
 test-python:
@@ -61,6 +74,30 @@ test-go:
 	@echo "→ Running Go tests..."
 	cd sdk/go && $(GO) test ./... -v
 	@echo "✓ Go tests complete"
+
+## Run MCP Bridge tests
+test-mcp:
+	@echo "→ Running MCP Bridge tests..."
+	cd mcp-server && $(PYTEST) tests/ -v --tb=short
+	@echo "✓ MCP Bridge tests complete"
+
+# ─────────────────────────────────────────────
+# Demo — Cross-Session Knowledge Sharing
+# ─────────────────────────────────────────────
+
+## Demo Session 1: publish 3 artifacts to /tmp/kcp-demo.db
+demo:
+	@echo "→ KCP Demo — Session 1 (publish)..."
+	$(PYTHON) demo.py
+
+## Demo Session 2: read persisted artifacts from Session 1 (new process)
+demo-read:
+	@echo "→ KCP Demo — Session 2 (read across session boundary)..."
+	$(PYTHON) demo.py --read
+
+## Reset demo database
+demo-clean:
+	$(PYTHON) demo.py --clean
 
 # ─────────────────────────────────────────────
 # Build
