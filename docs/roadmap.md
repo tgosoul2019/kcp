@@ -1,7 +1,7 @@
 # KCP Roadmap
 
-**Version:** 0.3  
-**Updated:** March 2026  
+**Version:** 0.4  
+**Updated:** June 2026  
 **Author:** Thiago Silva
 
 ---
@@ -12,24 +12,31 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
 
 ---
 
-## Current State (v0.2 — March 2026) ✅
+## Current State (v0.4 — June 2026) ✅
 
-### Completed
+### Completed (227 tests passing across all SDKs)
 
 - [x] Protocol specification (SPEC.md)
 - [x] Architecture design (3 operating modes: local, hub, federation)
-- [x] Python SDK — reference implementation (Python 3.13, **61 tests ✅**)
+- [x] Python SDK — reference implementation (Python 3.13, **216 tests ✅**)
   - [x] Embedded node (in-process, no server needed)
-  - [x] Local storage (SQLite + FTS5)
+  - [x] Local storage (SQLite + FTS5 + porter stemmer + BM25)
   - [x] Ed25519 signing and verification
   - [x] SHA-256 content hashing
+  - [x] AES-256-GCM encryption at rest
   - [x] Full-text search
   - [x] Lineage tracking (derivedFrom chains)
   - [x] Export/Import (offline sharing with signature verification)
   - [x] CLI (init, publish, search, list, lineage, serve, sync, stats)
-  - [x] Web UI (embedded single-page HTML)
+  - [x] Web dashboard UI (embedded SPA — artifacts, search, publish, peers, sync, replication)
   - [x] HTTP API (FastAPI) for P2P sharing
+  - [x] ACL enforcement (public / org / team / private)
   - [x] Hub backend client (for corporate deployments)
+  - [x] Sync queue (SQLite-backed, exponential backoff, circuit breaker)
+  - [x] Sync worker (background daemon)
+  - [x] Hybrid filesystem storage (content_store.py)
+  - [x] Peer discovery API (gossip + bootstrap via peers.json)
+  - [x] **Multi-peer replication factor** (kcp_replication table, ACK-based tracking, `complete` flag)
 - [x] TypeScript SDK — Node.js 25, ESM + CJS + DTS (**37 tests ✅**)
   - [x] KCPNode (publish, get, search, verify, lineage, stats)
   - [x] Ed25519 + SHA-256 via @noble/* (zero native deps)
@@ -40,118 +47,79 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
   - [x] Data models (pkg/models)
   - [x] SQLite storage backend (pkg/store)
   - [x] CLI entrypoint (cmd/kcp)
-- [x] **Total: 162 tests passing** (Python 61 + TypeScript 37 + Go 64)
-- [x] RFC (kcp-001-core.md + RFC-001-CORE.md)
-- [x] Whitepaper
-- [x] Executive presentation
-- [x] AI_AGENT_GUIDE.md (LLM integration guide)
-- [x] llms.txt (LLM indexing manifest)
-- [x] docs/testing.md (full test documentation)
-- [x] Root Makefile (unified test/build/setup orchestration)
-- [x] Isolated SDK environments (.python-version, .nvmrc, .go-version)
+- [x] MCP Bridge — VS Code / Claude / Cursor integration (**23 tests ✅**)
+  - [x] RFC KCP-002 (MCP Bridge Protocol)
+  - [x] kcp:// URI scheme
+  - [x] MCP session lineage (mcp_session_id, mcp_tool_call)
+- [x] **Total: 227 tests passing** across all SDKs + MCP bridge
+- [x] RFC KCP-001 (Core Protocol) + RFC KCP-002 (MCP Bridge) + RFC KCP-003 (Sync)
+- [x] Whitepaper, executive presentation, use cases
+- [x] Landing page (kcp-protocol.org) — ROI section, live peer widget
 
 ---
 
-## Phase 1: MCP Wrapper + Ecosystem SDKs (v0.3) 🔜
+## Phase 2: Production Infrastructure ✅ COMPLETE (June 2026)
 
-**Goal:** Make KCP usable from AI assistants (Claude, Cursor, Windsurf) and expand language coverage.
+**Goal:** Deploy multiple live nodes, establish peer network, production hardening.
 
-### MCP Wrapper Server
+### Completed
 
-Expose KCP as a Model Context Protocol server so AI assistants can call it directly:
-
-```
-Claude / Cursor / Windsurf
-      ↓ MCP protocol (standard Anthropic)
-  KCP-MCP Bridge (RFC KCP-002)
-      ↓ KCPNode API          ↑ auto-publish
-    SQLite (local)        KCP Artifacts
-```
-
-**4th operating mode: `bridge`** (alongside Local / Hub / Federation)
-- Injects KCP artifacts as MCP context → LLM "remembers" past knowledge
-- Captures MCP outputs → KCP artifacts with full lineage
-- New `kcp://` URI scheme for global artifact addressing
-- New lineage fields: `mcp_session_id`, `mcp_tool_call`
-
-**RFC:** [rfcs/kcp-002-mcp-bridge.md](../rfcs/kcp-002-mcp-bridge.md)
-
-### New SDKs
-
-- [ ] **Rust SDK** (`sdk/rust/`) — `ed25519-dalek`, `sha2`, `serde_json`, `rusqlite`
-- [ ] **Java SDK** (`sdk/java/`) — Bouncy Castle, SQLite JDBC, Jackson
-- [ ] **Kotlin/Mobile SDK** (`sdk/kotlin/`) — Android-compatible, Coroutines
+- [x] VPS deployment (DigitalOcean, Ubuntu 24.04, 165.22.151.182)
+- [x] **3 live peers** — peer04:8804, peer05:8805, peer07:8807 (same VPS, nginx routing)
+- [x] SSL/TLS — Let's Encrypt wildcard cert (peer04/05/07.kcp-protocol.org, valid Jun 2026)
+- [x] nginx per-hostname routing with rate limiting (kcp_general / kcp_sync / kcp_write zones)
+- [x] Kernel blackhole auto-ban daemon (IP abuse → ipset → kernel routing blackhole)
+- [x] X-KCP-Client header enforcement on public endpoints
+- [x] Peer discovery API (GET /kcp/v1/peers/discover, gossip, bootstrap via peers.json)
+- [x] docs/peers.json — public peer registry served by GitHub Pages
+- [x] Multi-peer replication factor (store.py kcp_replication table + node.py route + tests)
+- [x] Web dashboard UI (SPA — artifacts, search, publish, peers, sync, replication tabs)
+- [x] Traffic reporter daemon (kcp-traffic-report.py — GitHub API + peer health → email HTML)
+- [x] systemd services for all peers (kcp-peer04/05/07.service)
 
 ---
 
-## Phase 2: Shared Storage Transports (v0.4) 🔜
+## Phase 3: Multi-Region Federation (v0.5) 🔜
 
-**Goal:** Enable real-time sharing between users without a dedicated server.
+**Goal:** Deploy geographically distributed peers, true P2P federation across providers.
 
-### Google Drive / Dropbox / OneDrive Transport
+### New Peers (6 total)
 
-Use cloud storage the organization already has as a sync layer:
+- [ ] **peer01** — Europe (Amsterdam / Frankfurt) — Hetzner or Vultr
+- [ ] **peer02** — Americas (New York / São Paulo) — Linode or DigitalOcean
+- [ ] **peer03** — Asia Pacific (Singapore / Tokyo) — Vultr or DigitalOcean
+- [ ] **peer06** — Africa (Johannesburg) — Hetzner or dedicated provider
 
-```
-~/.kcp/
-├── kcp.db           (local index — always local)
-└── shared/          (synced folder — Google Drive, Dropbox, etc.)
-    ├── artifacts/
-    │   ├── abc-123.json   (signed metadata)
-    │   └── def-456.json
-    └── content/
-        ├── abc-123.bin    (raw content)
-        └── def-456.bin
-```
+Each peer: independent VPS, own SSL cert, own node_id, full sync mesh.
 
-**How it works:**
-1. User publishes artifact → SDK writes to `shared/` folder
-2. Cloud storage syncs to all team members automatically
-3. Other users' SDK watches `shared/` folder for new artifacts
-4. Auto-imports new artifacts, verifies signatures, indexes locally
+### Tasks
 
-**Config (one line):**
-```bash
-export KCP_SHARED="/Users/alice/Google Drive/My Drive/kcp-shared"
-```
-
-**Tasks:**
-- [ ] `SharedFolderBackend` — watches a folder for new artifacts
-- [ ] File-based artifact format (JSON metadata + binary content)
-- [ ] fswatch / watchdog for real-time detection
-- [ ] Auto-import with signature verification
-- [ ] Conflict resolution (same ID from different authors)
-- [ ] Test with Google Drive, Dropbox, and OneDrive
-
-### S3 / GCS / MinIO Transport
-
-Same concept, but using object storage:
-
-```bash
-export KCP_S3_BUCKET=s3://acme-corp-kcp
-export AWS_PROFILE=default
-```
-
-**Tasks:**
-- [ ] `S3Backend` — read/write artifacts to S3
-- [ ] Polling or S3 event notifications for real-time sync
-- [ ] IAM-based access control
-- [ ] Test with AWS S3 and MinIO (local)
+- [ ] Provision 4 new VPS (peer01–03, peer06)
+- [ ] Ansible playbook for repeatable peer setup
+- [ ] Cross-region latency benchmarks
+- [ ] Automatic peer health monitoring with alerts
+- [ ] Geographic routing (nearest peer auto-selection)
+- [ ] Multi-region replication health dashboard
 
 ---
 
-## Phase 2: Corporate Hub (v0.4)
+## Phase 4: IPFS & Decentralized Storage (v0.5)
 
-**Goal:** Centralized deployment for organizations.
+**Goal:** Content-addressed storage via IPFS for permanent, censorship-resistant artifact persistence.
 
-```
-EC2 (t3.small, $15/mo)
-├── FastAPI (REST API)
-├── PostgreSQL (metadata + FTS)
-├── S3 (content storage)
-├── Nginx + Let's Encrypt (HTTPS)
-└── OAuth2 / API Key auth
-```
+### Tasks
+
+- [ ] IPFS content backend (`IPFSBackend`) — CID-based addressing
+- [ ] Pin artifact content to IPFS on publish
+- [ ] kcp:// → ipfs:// URI mapping
+- [ ] IPFS gateway fallback for public artifacts
+- [ ] RFC KCP-005 (IPFS Storage Layer)
+
+---
+
+## Phase 5: Corporate Hub (v0.6) 🔜
+
+**Goal:** Centralized deployment for organizations — single-click enterprise setup.
 
 **Tasks:**
 - [ ] Hub server (FastAPI + PostgreSQL)
@@ -167,7 +135,7 @@ EC2 (t3.small, $15/mo)
 
 ---
 
-## Phase 3: Federation (v0.5)
+## Phase 6: Federation (v0.7)
 
 **Goal:** Hub-to-hub communication for cross-organization sharing.
 
@@ -180,18 +148,18 @@ EC2 (t3.small, $15/mo)
 
 ---
 
-## Phase 4: Advanced Features (v0.6)
+## Phase 7: Advanced Features (v0.8)
 
 - [ ] Semantic search (vector embeddings + cosine similarity)
 - [ ] Auto-tagging (LLM-based classification)
 - [ ] Knowledge graph visualization
 - [ ] Artifact versioning (update in place with history)
 - [ ] Notifications (new artifacts matching interests)
-- [ ] API rate limiting and quotas
+- [ ] RFC KCP-004 (Network Security Layer)
 
 ---
 
-## Phase 5: Ecosystem (v1.0)
+## Phase 8: Ecosystem (v1.0)
 
 - [ ] PyPI package (`pip install kcp`)
 - [ ] npm package (`npm install @kcp/client`)
@@ -201,6 +169,7 @@ EC2 (t3.small, $15/mo)
 - [ ] Helm chart for Kubernetes deployment
 - [ ] OpenAPI spec for hub API
 - [ ] Conformance test suite
+- [ ] Additional SDKs: Rust, Java, Kotlin/Mobile
 
 ---
 
@@ -208,10 +177,11 @@ EC2 (t3.small, $15/mo)
 
 | Feature | Impact | Effort | Priority |
 |---------|--------|--------|----------|
-| Google Drive transport | 🔥 High (solves sharing today) | Low (1-2 days) | **P0** |
-| S3 transport | High | Medium | P1 |
-| Corporate Hub | High | Medium (2-3 days) | P1 |
+| Multi-region peers (Phase 3) | 🔥 High (resilience + latency) | Medium | **P0** |
+| RFC KCP-004 (Network Security) | High | Low | P0 |
+| Corporate Hub | High | Medium | P1 |
 | Docker Compose | High | Low | P1 |
+| IPFS storage backend | Medium | High | P2 |
 | OAuth2 / SSO | Medium | Medium | P2 |
 | Federation | Medium | High | P3 |
 | Semantic search | Low | High | P3 |

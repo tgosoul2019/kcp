@@ -745,3 +745,110 @@ class TestPeerDiscovery:
         resp = client.get("/kcp/v1/peers")
         urls = [p["url"] for p in resp.json()["peers"]]
         assert "https://self.example.com" in urls
+
+
+# ─── Replication ─────────────────────────────────────────────────
+
+class TestReplication:
+    """Tests for multi-peer replication factor tracking."""
+
+    def test_replication_status_empty(self, tmp_node):
+        """New artifact has count=0 and empty replicated_to list."""
+        art = tmp_node.publish(title="Rep test", content="hello", format="text")
+        status = tmp_node.store.get_replication_status(art.id)
+        assert status["artifact_id"] == art.id
+        assert status["count"] == 0
+        assert status["replicated_to"] == []
+
+    def test_record_replication_manual(self, tmp_node):
+        """record_replication() upserts a peer entry."""
+        art = tmp_node.publish(title="Manual", content="data", format="text")
+        tmp_node.store.record_replication(art.id, "https://peer-a.example.com")
+        status = tmp_node.store.get_replication_status(art.id)
+        assert status["count"] == 1
+        assert "https://peer-a.example.com" in status["replicated_to"]
+
+    def test_ack_sync_auto_records_replication(self, tmp_node):
+        """ack_sync() automatically records replication from queue row."""
+        art = tmp_node.publish(title="Auto", content="data", format="text")
+        tmp_node.store.enqueue_sync(art.id, ["https://peer-b.example.com"])
+        # Dequeue to get ID
+        items = tmp_node.store.dequeue_pending_sync(batch_size=10)
+        assert len(items) == 1
+        queue_id = items[0]["id"]
+        tmp_node.store.ack_sync(queue_id)
+        status = tmp_node.store.get_replication_status(art.id)
+        assert status["count"] == 1
+        assert "https://peer-b.example.com" in status["replicated_to"]
+
+    def test_replication_idempotent(self, tmp_node):
+        """Double-ACK for the same peer keeps count=1."""
+        art = tmp_node.publish(title="Idem", content="data", format="text")
+        tmp_node.store.record_replication(art.id, "https://peer-c.example.com")
+        tmp_node.store.record_replication(art.id, "https://peer-c.example.com")
+        status = tmp_node.store.get_replication_status(art.id)
+        assert status["count"] == 1
+
+    def test_replication_multiple_peers(self, tmp_node):
+        """Multiple peers ACKing increments count correctly."""
+        art = tmp_node.publish(title="Multi", content="data", format="text")
+        tmp_node.store.record_replication(art.id, "https://peer-1.example.com")
+        tmp_node.store.record_replication(art.id, "https://peer-2.example.com")
+        tmp_node.store.record_replication(art.id, "https://peer-3.example.com")
+        status = tmp_node.store.get_replication_status(art.id)
+        assert status["count"] == 3
+        assert len(status["replicated_to"]) == 3
+
+    def test_replication_endpoint_returns_factor(self, client_with_artifact):
+        """GET /kcp/v1/artifacts/{id}/replication returns replication_factor."""
+        client, artifact, node = client_with_artifact
+        resp = client.get(f"/kcp/v1/artifacts/{artifact.id}/replication")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "replication_factor" in data
+        assert "complete" in data
+        assert data["artifact_id"] == artifact.id
+
+    def test_replication_endpoint_not_found(self, client):
+        """GET /kcp/v1/artifacts/nonexistent/replication returns 404."""
+        resp = client.get("/kcp/v1/artifacts/nonexistent-id/replication")
+        assert resp.status_code == 404
+
+    def test_set_replication_factor(self, tmp_node):
+        """set_replication_factor() persists the value in kcp_config."""
+        tmp_node.set_replication_factor(3)
+        val = tmp_node.store.get_config("replication_factor")
+        assert val == "3"
+
+    def test_complete_flag_false_when_insufficient(self, client_with_artifact):
+        """complete=False when count < replication_factor."""
+        client, artifact, node = client_with_artifact
+        node.set_replication_factor(5)
+        node.store.record_replication(artifact.id, "https://only-one.example.com")
+        resp = client.get(f"/kcp/v1/artifacts/{artifact.id}/replication")
+        data = resp.json()
+        assert data["count"] == 1
+        assert data["replication_factor"] == 5
+        assert data["complete"] is False
+
+    def test_complete_flag_true_when_met(self, client_with_artifact):
+        """complete=True when count >= replication_factor."""
+        client, artifact, node = client_with_artifact
+        node.set_replication_factor(2)
+        node.store.record_replication(artifact.id, "https://peer-x.example.com")
+        node.store.record_replication(artifact.id, "https://peer-y.example.com")
+        resp = client.get(f"/kcp/v1/artifacts/{artifact.id}/replication")
+        data = resp.json()
+        assert data["count"] == 2
+        assert data["complete"] is True
+
+    def test_replication_summary(self, tmp_node):
+        """get_replication_summary() returns dict of artifact_id → peer count."""
+        a1 = tmp_node.publish(title="A1", content="x", format="text")
+        a2 = tmp_node.publish(title="A2", content="y", format="text")
+        tmp_node.store.record_replication(a1.id, "https://p1.example.com")
+        tmp_node.store.record_replication(a1.id, "https://p2.example.com")
+        tmp_node.store.record_replication(a2.id, "https://p1.example.com")
+        summary = tmp_node.store.get_replication_summary()
+        assert summary[a1.id] == 2
+        assert summary[a2.id] == 1

@@ -110,6 +110,16 @@ CREATE TABLE IF NOT EXISTS kcp_sync_queue (
 
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON kcp_sync_queue(status, next_attempt);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_artifact ON kcp_sync_queue(artifact_id);
+
+-- Replication tracking: how many peers have ACKed each artifact
+CREATE TABLE IF NOT EXISTS kcp_replication (
+    artifact_id  TEXT NOT NULL,
+    peer_url     TEXT NOT NULL,
+    acked_at     TEXT NOT NULL,
+    PRIMARY KEY (artifact_id, peer_url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_replication_artifact ON kcp_replication(artifact_id);
 """
 
 FTS_SQL = """
@@ -856,13 +866,23 @@ class LocalStore:
         return [dict(r) for r in rows]
 
     def ack_sync(self, queue_id: int):
-        """Mark a sync queue entry as successfully delivered (peer ACKed)."""
+        """Mark a sync queue entry as successfully delivered — also records replication."""
         conn = self._get_conn()
         now = datetime.now(timezone.utc).isoformat()
+        # Fetch artifact_id + peer_url before updating
+        row = conn.execute(
+            "SELECT artifact_id, peer_url FROM kcp_sync_queue WHERE id = ?", (queue_id,)
+        ).fetchone()
         conn.execute(
             "UPDATE kcp_sync_queue SET status = 'done', acked_at = ?, error = NULL WHERE id = ?",
             (now, queue_id),
         )
+        # Record successful replication
+        if row:
+            conn.execute(
+                "INSERT OR REPLACE INTO kcp_replication (artifact_id, peer_url, acked_at) VALUES (?, ?, ?)",
+                (row["artifact_id"], row["peer_url"], now),
+            )
         conn.commit()
 
     def nack_sync(self, queue_id: int, error: str, max_attempts: int = 7):
@@ -911,3 +931,45 @@ class LocalStore:
                 peers[url] = {"pending": 0, "in_flight": 0, "done": 0, "failed": 0}
             peers[url][row["status"]] = peers[url].get(row["status"], 0) + row["cnt"]
         return peers
+
+    # ─── Replication ───────────────────────────────────────────
+
+    def record_replication(self, artifact_id: str, peer_url: str):
+        """Mark that a peer has successfully ACKed this artifact."""
+        conn = self._get_conn()
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT OR REPLACE INTO kcp_replication (artifact_id, peer_url, acked_at) VALUES (?, ?, ?)",
+            (artifact_id, peer_url, now),
+        )
+        conn.commit()
+
+    def get_replication_status(self, artifact_id: str) -> dict:
+        """
+        Return replication info for an artifact.
+        {
+          "artifact_id": "...",
+          "replicated_to": ["https://peer04...", ...],
+          "count": 2,
+        }
+        """
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT peer_url, acked_at FROM kcp_replication WHERE artifact_id = ? ORDER BY acked_at",
+            (artifact_id,),
+        ).fetchall()
+        return {
+            "artifact_id": artifact_id,
+            "replicated_to": [r["peer_url"] for r in rows],
+            "acked_at": {r["peer_url"]: r["acked_at"] for r in rows},
+            "count": len(rows),
+        }
+
+    def get_replication_summary(self) -> dict:
+        """Return replication counts per artifact (useful for dashboard)."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT artifact_id, COUNT(*) as peer_count FROM kcp_replication GROUP BY artifact_id"
+        ).fetchall()
+        return {r["artifact_id"]: r["peer_count"] for r in rows}
+

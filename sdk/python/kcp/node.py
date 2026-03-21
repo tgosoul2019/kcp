@@ -239,6 +239,22 @@ class KCPNode:
             "peers": {},
         }
 
+    def replication_status(self, artifact_id: str) -> dict:
+        """Return how many peers have a confirmed copy of this artifact."""
+        status = self.store.get_replication_status(artifact_id)
+        rf = int(self.store.get_config("replication_factor") or len(self.peers) or 1)
+        status["replication_factor"] = rf
+        status["complete"] = status["count"] >= rf
+        return status
+
+    def set_replication_factor(self, n: int):
+        """
+        Set the desired replication factor — how many peers must ACK
+        before an artifact is considered fully replicated.
+        Default: number of known peers (full replication).
+        """
+        self.store.set_config("replication_factor", str(n))
+
     def close(self):
         """Gracefully stop background workers."""
         if self._sync_worker:
@@ -511,6 +527,19 @@ class KCPNode:
         @app.get("/kcp/v1/artifacts/{artifact_id}/lineage")
         def get_lineage(artifact_id: str):
             return {"lineage": self.lineage(artifact_id)}
+
+        @app.get("/kcp/v1/artifacts/{artifact_id}/replication")
+        def get_replication(artifact_id: str):
+            """Return replication status — how many peers have a confirmed copy."""
+            a = self.get(artifact_id)
+            if not a:
+                raise HTTPException(404, "Artifact not found")
+            status = self.store.get_replication_status(artifact_id)
+            # Enrich with replication factor config
+            rf = int(self.store.get_config("replication_factor") or len(self.peers) or 1)
+            status["replication_factor"] = rf
+            status["complete"] = status["count"] >= rf
+            return status
 
         @app.post("/kcp/v1/artifacts")
         def publish_artifact(body: dict):

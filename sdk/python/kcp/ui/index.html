@@ -111,6 +111,8 @@ textarea { min-height: 150px; resize: vertical; font-family: 'JetBrains Mono', m
     <button class="tab active" data-tab="artifacts">📄 Artifacts</button>
     <button class="tab" data-tab="publish">✏️ Publish</button>
     <button class="tab" data-tab="peers">🔗 Peers</button>
+    <button class="tab" data-tab="sync">🔄 Sync</button>
+    <button class="tab" data-tab="replication">📡 Replication</button>
     <button class="tab" data-tab="about">ℹ️ About</button>
   </div>
 
@@ -170,6 +172,68 @@ textarea { min-height: 150px; resize: vertical; font-family: 'JetBrains Mono', m
     <div id="peers-list"></div>
   </div>
 
+  <!-- Sync Panel -->
+  <div class="panel" id="panel-sync">
+    <div id="sync-stats-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <div class="card" style="text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:#f59e0b" id="sync-pending">—</div>
+        <div style="font-size:.75em;color:var(--muted);margin-top:4px">PENDING</div>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent2)" id="sync-inflight">—</div>
+        <div style="font-size:.75em;color:var(--muted);margin-top:4px">IN FLIGHT</div>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent)" id="sync-done">—</div>
+        <div style="font-size:.75em;color:var(--muted);margin-top:4px">DELIVERED</div>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--danger)" id="sync-failed">—</div>
+        <div style="font-size:.75em;color:var(--muted);margin-top:4px">FAILED</div>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600">Status per Peer</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:rgba(0,0,0,.2)">
+            <th style="padding:8px 16px;text-align:left;font-size:.8em;color:var(--muted);font-weight:600">Peer</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">Pending</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">In Flight</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">Done</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">Failed</th>
+          </tr>
+        </thead>
+        <tbody id="sync-table-body">
+          <tr><td colspan="5" style="padding:2rem;text-align:center;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Replication Panel -->
+  <div class="panel" id="panel-replication">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:600">Replication Status per Artifact</span>
+        <span style="font-size:.8em;color:var(--muted)">ACK-based tracking</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:rgba(0,0,0,.2)">
+            <th style="padding:8px 16px;text-align:left;font-size:.8em;color:var(--muted);font-weight:600">Artifact</th>
+            <th style="padding:8px 16px;text-align:left;font-size:.8em;color:var(--muted);font-weight:600">Replicated To</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">Count / Factor</th>
+            <th style="padding:8px 16px;text-align:center;font-size:.8em;color:var(--muted);font-weight:600">Complete?</th>
+          </tr>
+        </thead>
+        <tbody id="replication-table-body">
+          <tr><td colspan="4" style="padding:2rem;text-align:center;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- About Panel -->
   <div class="panel" id="panel-about">
     <div class="card">
@@ -210,6 +274,10 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'sync') loadSync();
+    if (tab.dataset.tab === 'replication') loadReplication();
+    if (tab.dataset.tab === 'peers') loadPeers();
+    if (tab.dataset.tab === 'artifacts') loadArtifacts();
   });
 });
 
@@ -418,10 +486,75 @@ function toast(msg, isError) {
 
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+async function loadSync() {
+  try {
+    const r = await fetch(API + '/kcp/v1/sync/status');
+    const d = await r.json();
+    const peers = d.peers || {};
+    let totP=0, totI=0, totD=0, totF=0;
+    const rows = Object.entries(peers).map(([url, s]) => {
+      const p = s.pending||0, i = s.in_flight||0, done = s.done||0, f = s.failed||0;
+      totP+=p; totI+=i; totD+=done; totF+=f;
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:10px 16px;font-size:.85em">${esc(url)}</td>
+        <td style="padding:10px;text-align:center;color:#f59e0b;font-weight:700">${p}</td>
+        <td style="padding:10px;text-align:center;color:var(--accent2);font-weight:700">${i}</td>
+        <td style="padding:10px;text-align:center;color:var(--accent);font-weight:700">${done}</td>
+        <td style="padding:10px;text-align:center;color:var(--danger);font-weight:700">${f}</td>
+      </tr>`;
+    });
+    document.getElementById('sync-pending').textContent = totP;
+    document.getElementById('sync-inflight').textContent = totI;
+    document.getElementById('sync-done').textContent = totD;
+    document.getElementById('sync-failed').textContent = totF;
+    const tbody = document.getElementById('sync-table-body');
+    tbody.innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="5" style="padding:2rem;text-align:center;color:var(--muted)">No peers in sync queue</td></tr>';
+  } catch(e) {}
+}
+
+async function loadReplication() {
+  try {
+    const r = await fetch(API + '/kcp/v1/artifacts?limit=50');
+    const d = await r.json();
+    const arts = d.artifacts || d.results || [];
+    const tbody = document.getElementById('replication-table-body');
+    if (!arts.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:2rem;text-align:center;color:var(--muted)">No artifacts yet</td></tr>';
+      return;
+    }
+    const sample = arts.slice(0, 25);
+    const statuses = await Promise.allSettled(
+      sample.map(a => fetch(API + '/kcp/v1/artifacts/' + a.id + '/replication').then(r => r.json()))
+    );
+    tbody.innerHTML = sample.map((a, i) => {
+      const st = statuses[i].status === 'fulfilled' ? statuses[i].value : null;
+      const count = st?.count ?? '?';
+      const rf    = st?.replication_factor ?? '?';
+      const ok    = st?.complete;
+      const peers = (st?.replicated_to || []).map(u => `<span class="tag" style="background:rgba(59,130,246,.12);color:var(--accent2)">${esc(u.replace(/https?:\/\//,''))}</span>`).join('');
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:10px 16px">
+          <div style="font-weight:600;font-size:.9em">${esc(a.title)}</div>
+          <div style="font-size:.75em;color:var(--muted);font-family:monospace">${a.id.slice(0,12)}…</div>
+        </td>
+        <td style="padding:10px 16px;font-size:.85em">${peers || '<span style="color:var(--muted)">none</span>'}</td>
+        <td style="padding:10px;text-align:center;font-weight:700">${count}/${rf}</td>
+        <td style="padding:10px;text-align:center">
+          ${ok===true ? '<span style="color:var(--accent)">✅ complete</span>' : ok===false ? '<span style="color:#f59e0b">⏳ partial</span>' : '—'}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
 // Init
 loadStats();
 loadArtifacts();
 loadPeers();
+loadSync();
+loadReplication();
 </script>
 </body>
 </html>
