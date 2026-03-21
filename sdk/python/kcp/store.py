@@ -551,6 +551,34 @@ class LocalStore:
         )
         conn.commit()
 
+    def upsert_peer(self, url: str, name: str = "", node_id: str = "",
+                    public_key: str = "", artifact_count: int = 0):
+        """
+        Insert or update a peer by URL.
+        Used for gossip-discovered peers — no pre-assigned ID needed.
+        """
+        conn = self._get_conn()
+        now = datetime.now(timezone.utc).isoformat()
+        existing = conn.execute(
+            "SELECT id FROM kcp_peers WHERE url = ?", (url,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE kcp_peers SET name = COALESCE(NULLIF(?, ''), name), "
+                "last_seen = ?, public_key = COALESCE(NULLIF(?, ''), public_key) "
+                "WHERE url = ?",
+                (name, now, public_key, url),
+            )
+        else:
+            import uuid
+            peer_id = node_id or str(uuid.uuid4())
+            conn.execute(
+                "INSERT INTO kcp_peers (id, url, name, public_key, last_seen, added_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (peer_id, url, name, public_key, now, now),
+            )
+        conn.commit()
+
     def get_peers(self) -> list[dict]:
         """List all known peers."""
         conn = self._get_conn()
@@ -562,6 +590,13 @@ class LocalStore:
         conn = self._get_conn()
         now = datetime.now(timezone.utc).isoformat()
         conn.execute("UPDATE kcp_peers SET last_seen = ? WHERE id = ?", (now, peer_id))
+        conn.commit()
+
+    def update_peer_seen_by_url(self, url: str):
+        """Update last_seen for a peer by URL."""
+        conn = self._get_conn()
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute("UPDATE kcp_peers SET last_seen = ? WHERE url = ?", (now, url))
         conn.commit()
 
     # ─── Sync ──────────────────────────────────────────────────

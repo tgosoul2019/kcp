@@ -256,6 +256,96 @@ class KCPNode:
         """List known peers."""
         return self.store.get_peers()
 
+    def discover_peers(
+        self,
+        bootstrap_url: str = "https://kcp-protocol.org/peers.json",
+        gossip: bool = True,
+    ) -> dict:
+        """
+        Peer discovery via two complementary mechanisms:
+
+        1. **Bootstrap registry** — fetches the official peers.json from
+           the KCP project site. Safe, curated, always up-to-date.
+
+        2. **Gossip** — queries each known peer's /kcp/v1/peers endpoint
+           and learns about their known peers recursively (1 hop).
+
+        All discovered peers are upserted into the local kcp_peers table
+        so they become available for future sync and for exposing via
+        this node's own /kcp/v1/peers endpoint (P2P propagation).
+
+        Returns a summary: {"discovered": N, "bootstrap": N, "gossip": N}
+        """
+        try:
+            import httpx
+        except ImportError:
+            return {"error": "httpx required. pip install httpx"}
+
+        discovered_total = 0
+        bootstrap_count = 0
+        gossip_count = 0
+
+        # ── 1. Bootstrap from official registry ──────────────
+        try:
+            resp = httpx.get(bootstrap_url, timeout=10.0, follow_redirects=True)
+            if resp.status_code == 200:
+                registry = resp.json()
+                for peer in registry.get("peers", []):
+                    url = peer.get("url", "").rstrip("/")
+                    if url and url != self._self_url():
+                        self.store.upsert_peer(
+                            url=url,
+                            name=peer.get("name", ""),
+                            node_id=peer.get("node_id", ""),
+                            public_key=peer.get("public_key", ""),
+                        )
+                        bootstrap_count += 1
+                        discovered_total += 1
+        except Exception:
+            pass  # Network unavailable — continue with gossip
+
+        # ── 2. Gossip from currently known peers ─────────────
+        if gossip:
+            known_peers = self.store.get_peers()
+            known_urls = {p["url"] for p in known_peers}
+
+            for peer in known_peers:
+                peer_url = peer["url"].rstrip("/")
+                try:
+                    resp = httpx.get(
+                        f"{peer_url}/kcp/v1/peers",
+                        headers=self._KCP_CLIENT_HEADER,
+                        timeout=8.0,
+                    )
+                    if resp.status_code == 200:
+                        remote_peers = resp.json().get("peers", [])
+                        for rp in remote_peers:
+                            rurl = rp.get("url", "").rstrip("/")
+                            if rurl and rurl not in known_urls and rurl != self._self_url():
+                                self.store.upsert_peer(
+                                    url=rurl,
+                                    name=rp.get("name", ""),
+                                    node_id=rp.get("node_id", ""),
+                                    public_key=rp.get("public_key", ""),
+                                )
+                                known_urls.add(rurl)
+                                gossip_count += 1
+                                discovered_total += 1
+                        # Mark peer as reachable
+                        self.store.update_peer_seen_by_url(peer_url)
+                except Exception:
+                    continue  # Peer unreachable — skip
+
+        return {
+            "discovered": discovered_total,
+            "bootstrap": bootstrap_count,
+            "gossip": gossip_count,
+        }
+
+    def _self_url(self) -> str:
+        """Return this node's own public URL (from KCP_SELF_URL env), or empty string."""
+        return os.environ.get("KCP_SELF_URL", "").rstrip("/")
+
     # Header sent on all outbound peer requests — required by public peers
     _KCP_CLIENT_HEADER = {"X-KCP-Client": f"kcp-python/0.2.0"}
 
@@ -461,15 +551,61 @@ class KCPNode:
             is_new = self.store.import_artifact(body)
             return {"accepted": is_new, "id": artifact_id}
 
-        # Peers
+        # Peers — discovery & registry
         @app.get("/kcp/v1/peers")
         def list_peers():
-            return {"peers": self.get_peers()}
+            """
+            Return all known peers enriched with this node's own info.
+            Used by clients and other peers for gossip-based discovery.
+            """
+            raw = self.get_peers()
+            peers_out = []
+            for p in raw:
+                peers_out.append({
+                    "node_id": p.get("id", ""),
+                    "url": p.get("url", ""),
+                    "name": p.get("name", ""),
+                    "last_seen": p.get("last_seen", ""),
+                    "added_at": p.get("added_at", ""),
+                })
+            # Also expose self so other peers can learn about us
+            self_url = self._self_url()
+            if self_url:
+                self_entry = {
+                    "node_id": self.node_id,
+                    "url": self_url,
+                    "name": self.store.get_config("node_name") or "",
+                    "last_seen": datetime.now(timezone.utc).isoformat(),
+                    "added_at": "",
+                }
+                # Prepend self if not already listed
+                if not any(p["url"].rstrip("/") == self_url for p in peers_out):
+                    peers_out.insert(0, self_entry)
+            return {"peers": peers_out, "total": len(peers_out), "node_id": self.node_id}
 
         @app.post("/kcp/v1/peers")
         def register_peer(body: dict):
+            """Register a peer manually by URL."""
             pid = self.add_peer(body.get("url", ""), body.get("name", ""))
             return {"peer_id": pid}
+
+        @app.post("/kcp/v1/peers/announce")
+        def announce_peer(body: dict):
+            """
+            A peer announces itself to this node.
+            Body: {"url": "https://...", "node_id": "...", "name": "..."}
+            Triggers gossip: this node learns the announcing peer's known peers.
+            """
+            url = body.get("url", "").rstrip("/")
+            if not url:
+                raise HTTPException(400, "url required")
+            self.store.upsert_peer(
+                url=url,
+                name=body.get("name", ""),
+                node_id=body.get("node_id", ""),
+                public_key=body.get("public_key", ""),
+            )
+            return {"accepted": True, "node_id": self.node_id}
 
         # Web UI
         @app.get("/ui", response_class=HTMLResponse)

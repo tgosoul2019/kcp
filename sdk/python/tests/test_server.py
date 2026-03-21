@@ -606,3 +606,142 @@ class TestACLEnforcement:
         private_ids = [a.id for a in acl_node.list() if a.visibility == "private"]
         for pid in private_ids:
             assert pid not in ids
+
+
+# ─── Peer Discovery ──────────────────────────────────────────
+
+
+class TestPeerDiscovery:
+    """Tests for /kcp/v1/peers, /kcp/v1/peers/announce, and discover_peers()."""
+
+    def test_list_peers_empty(self, client):
+        """GET /kcp/v1/peers returns empty list when no peers known."""
+        resp = client.get("/kcp/v1/peers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "peers" in data
+        assert "total" in data
+        assert "node_id" in data
+
+    def test_register_peer_via_post(self, client, tmp_node):
+        """POST /kcp/v1/peers registers a peer."""
+        resp = client.post("/kcp/v1/peers", json={
+            "url": "https://peer04.kcp-protocol.org",
+            "name": "Test Peer",
+        })
+        assert resp.status_code == 200
+        assert "peer_id" in resp.json()
+
+    def test_registered_peer_appears_in_list(self, client, tmp_node):
+        """Peer registered via POST appears in GET /kcp/v1/peers."""
+        client.post("/kcp/v1/peers", json={
+            "url": "https://peer05.kcp-protocol.org",
+            "name": "Peer 05",
+        })
+        resp = client.get("/kcp/v1/peers")
+        urls = [p["url"] for p in resp.json()["peers"]]
+        assert "https://peer05.kcp-protocol.org" in urls
+
+    def test_peers_list_includes_node_id(self, client, tmp_node):
+        """GET /kcp/v1/peers includes this node's node_id."""
+        resp = client.get("/kcp/v1/peers")
+        assert resp.json()["node_id"] == tmp_node.node_id
+
+    def test_announce_peer_endpoint(self, client, tmp_node):
+        """POST /kcp/v1/peers/announce registers announcing peer."""
+        resp = client.post("/kcp/v1/peers/announce", json={
+            "url": "https://peer07.kcp-protocol.org",
+            "node_id": "test-node-007",
+            "name": "Peer 07",
+        })
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["accepted"] is True
+        assert body["node_id"] == tmp_node.node_id
+
+    def test_announced_peer_appears_in_list(self, client, tmp_node):
+        """Announced peer appears in /kcp/v1/peers."""
+        client.post("/kcp/v1/peers/announce", json={
+            "url": "https://announced.example.com",
+            "node_id": "abc-123",
+        })
+        resp = client.get("/kcp/v1/peers")
+        urls = [p["url"] for p in resp.json()["peers"]]
+        assert "https://announced.example.com" in urls
+
+    def test_announce_without_url_returns_400(self, client):
+        """POST /kcp/v1/peers/announce without url returns 400."""
+        resp = client.post("/kcp/v1/peers/announce", json={"name": "no-url"})
+        assert resp.status_code == 400
+
+    def test_upsert_peer_updates_existing(self, tmp_node):
+        """upsert_peer updates name/last_seen for existing URL."""
+        tmp_node.store.upsert_peer("https://p.example.com", name="Old Name")
+        tmp_node.store.upsert_peer("https://p.example.com", name="New Name")
+        peers = tmp_node.store.get_peers()
+        matching = [p for p in peers if p["url"] == "https://p.example.com"]
+        assert len(matching) == 1
+        assert matching[0]["name"] == "New Name"
+
+    def test_update_peer_seen_by_url(self, tmp_node):
+        """update_peer_seen_by_url updates last_seen."""
+        tmp_node.store.upsert_peer("https://timed.example.com", name="T")
+        tmp_node.store.update_peer_seen_by_url("https://timed.example.com")
+        peers = tmp_node.store.get_peers()
+        p = next(x for x in peers if x["url"] == "https://timed.example.com")
+        assert p["last_seen"] is not None
+
+    def test_discover_peers_network_unavailable(self, tmp_node):
+        """discover_peers gracefully handles network errors."""
+        result = tmp_node.discover_peers(
+            bootstrap_url="https://invalid.kcp-protocol.example",
+            gossip=False,
+        )
+        # Should return summary dict without raising
+        assert "discovered" in result
+        assert "bootstrap" in result
+        assert "gossip" in result
+
+    def test_gossip_from_peer_with_known_peers(self, tmp_path):
+        """Gossip: node A learns peer C by querying peer B's /kcp/v1/peers."""
+        import os
+        # Node A — the discoverer
+        node_a = KCPNode(
+            user_id="a@test.com",
+            db_path=str(tmp_path / "a.db"),
+            keys_dir=str(tmp_path / "ka"),
+        )
+        # Node B — has peer C registered
+        node_b = KCPNode(
+            user_id="b@test.com",
+            db_path=str(tmp_path / "b.db"),
+            keys_dir=str(tmp_path / "kb"),
+        )
+        node_b.store.upsert_peer("https://peer-c.example.com", name="Peer C")
+
+        # Register node B in node A's store
+        node_a.store.upsert_peer("http://testserver", name="Node B")
+
+        # Serve node B and let node A gossip
+        app_b = node_b.create_app()
+        client_b = TestClient(app_b)
+
+        # Simulate gossip: node A calls node B's /kcp/v1/peers
+        resp = client_b.get("/kcp/v1/peers")
+        assert resp.status_code == 200
+        peers_from_b = resp.json()["peers"]
+        urls_from_b = [p["url"] for p in peers_from_b]
+        assert "https://peer-c.example.com" in urls_from_b
+
+    def test_peers_list_self_entry_when_env_set(self, tmp_path, monkeypatch):
+        """When KCP_SELF_URL is set, GET /kcp/v1/peers includes self."""
+        monkeypatch.setenv("KCP_SELF_URL", "https://self.example.com")
+        node = KCPNode(
+            user_id="me@test.com",
+            db_path=str(tmp_path / "s.db"),
+            keys_dir=str(tmp_path / "ks"),
+        )
+        client = TestClient(node.create_app())
+        resp = client.get("/kcp/v1/peers")
+        urls = [p["url"] for p in resp.json()["peers"]]
+        assert "https://self.example.com" in urls

@@ -228,7 +228,7 @@
         </div>
         <div class="stats-row fade-up d4">
             <div class="stat-card"><div class="stat-num">4</div><div class="stat-lbl">SDKs + MCP Bridge</div></div>
-            <div class="stat-card"><div class="stat-num">204</div><div class="stat-lbl">Testes passando</div></div>
+            <div class="stat-card"><div class="stat-num">216</div><div class="stat-lbl">Testes passando</div></div>
             <div class="stat-card"><div class="stat-num">3</div><div class="stat-lbl">Peers públicos live</div></div>
             <div class="stat-card"><div class="stat-num">Ed25519</div><div class="stat-lbl">Assinatura digital</div></div>
         </div>
@@ -649,41 +649,36 @@
     <div class="container">
         <div class="sec-eyebrow fade-up">REDE P2P</div>
         <h2 class="fade-up">Peers públicos</h2>
-        <p class="sec-desc fade-up">Nós abertos para sync. Sem conta, sem configuração — só apontar e sincronizar.</p>
-        <div style="margin-top:2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem" class="fade-up">
-            <div style="padding:1.5rem;background:var(--bg-card);border:1.5px solid var(--green-mid);border-radius:var(--radius-lg)">
-                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-                    <span style="font-size:1.25rem">🟢</span>
-                    <div>
-                        <div style="font-weight:700;font-size:.95rem">peer04.kcp-protocol.org</div>
-                        <div style="font-size:.8rem;color:var(--green)">● Live — DigitalOcean BRA</div>
-                    </div>
+        <p class="sec-desc fade-up">Nós abertos para sync. Sem conta, sem configuração — só apontar e sincronizar. Status verificado em tempo real.</p>
+
+        <!-- Live peer cards — populadas por JS -->
+        <div id="peers-grid" style="margin-top:2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem" class="fade-up">
+            <!-- Skeleton enquanto carrega -->
+            <div class="peer-card-skeleton" style="height:120px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-lg);animation:pulse 1.5s infinite"></div>
+            <div class="peer-card-skeleton" style="height:120px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-lg);animation:pulse 1.5s infinite"></div>
+            <div class="peer-card-skeleton" style="height:120px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-lg);animation:pulse 1.5s infinite"></div>
+        </div>
+
+        <!-- Discovery + Gossip info -->
+        <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem" class="fade-up">
+            <div style="padding:1.25rem 1.5rem;background:var(--bg-card);border:1.5px solid var(--border-strong);border-radius:var(--radius)">
+                <div style="font-weight:700;margin-bottom:.5rem;color:var(--text-2)">� Peer Discovery</div>
+                <div style="color:var(--text-muted);font-size:.875rem;line-height:1.75">Cada peer expõe <code>/kcp/v1/peers</code> com a lista de pares conhecidos. Clientes descobrem novos nós automaticamente via <strong>gossip</strong> (1 hop) ou pelo registry oficial.</div>
+                <div style="margin-top:.75rem">
+                    <code style="font-size:.8rem;background:var(--bg-soft);padding:.4rem .75rem;border-radius:6px;display:block;color:var(--text-2)">node.discover_peers()  # bootstrap + gossip</code>
                 </div>
-                <code style="font-size:.8rem;background:var(--bg-soft);padding:.5rem .75rem;border-radius:6px;display:block;color:var(--text-2)">curl https://peer04.kcp-protocol.org/kcp/v1/health</code>
             </div>
-            <div style="padding:1.5rem;background:var(--bg-card);border:1.5px solid var(--green-mid);border-radius:var(--radius-lg)">
-                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-                    <span style="font-size:1.25rem">🟢</span>
-                    <div>
-                        <div style="font-weight:700;font-size:.95rem">peer05.kcp-protocol.org</div>
-                        <div style="font-size:.8rem;color:var(--green)">● Live — DigitalOcean BRA</div>
-                    </div>
+            <div style="padding:1.25rem 1.5rem;background:var(--bg-card);border:1.5px solid var(--border-strong);border-radius:var(--radius)">
+                <div style="font-weight:700;margin-bottom:.5rem;color:var(--text-2)">� Registry público</div>
+                <div style="color:var(--text-muted);font-size:.875rem;line-height:1.75">Peers bootstrapam via registry canônico servido pelo site oficial. Peers privados podem usar lista estática via variável de ambiente <code>KCP_PEERS</code>.</div>
+                <div style="margin-top:.75rem">
+                    <a href="/peers.json" style="font-size:.8rem;background:var(--bg-soft);padding:.4rem .75rem;border-radius:6px;display:inline-block;color:var(--blue);text-decoration:none;font-family:monospace">kcp-protocol.org/peers.json ↗</a>
                 </div>
-                <code style="font-size:.8rem;background:var(--bg-soft);padding:.5rem .75rem;border-radius:6px;display:block;color:var(--text-2)">curl https://peer05.kcp-protocol.org/kcp/v1/health</code>
-            </div>
-            <div style="padding:1.5rem;background:var(--bg-card);border:1.5px solid var(--green-mid);border-radius:var(--radius-lg)">
-                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-                    <span style="font-size:1.25rem">🟢</span>
-                    <div>
-                        <div style="font-weight:700;font-size:.95rem">peer07.kcp-protocol.org</div>
-                        <div style="font-size:.8rem;color:var(--green)">● Live — DigitalOcean BRA</div>
-                    </div>
-                </div>
-                <code style="font-size:.8rem;background:var(--bg-soft);padding:.5rem .75rem;border-radius:6px;display:block;color:var(--text-2)">curl https://peer07.kcp-protocol.org/kcp/v1/health</code>
             </div>
         </div>
-        <!-- Arquitetura isolada -->
-        <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:var(--bg-card);border:1.5px solid var(--border-strong);border-radius:var(--radius);font-size:.875rem;display:grid;grid-template-columns:1fr 1fr;gap:1.5rem" class="fade-up">
+
+        <!-- Arquitetura isolada + Blackhole -->
+        <div style="margin-top:1rem;padding:1.25rem 1.5rem;background:var(--bg-card);border:1.5px solid var(--border-strong);border-radius:var(--radius);font-size:.875rem;display:grid;grid-template-columns:1fr 1fr;gap:1.5rem" class="fade-up">
             <div>
                 <div style="font-weight:700;margin-bottom:.5rem;color:var(--text-2)">🗂️ Dados isolados por peer</div>
                 <div style="color:var(--text-muted);line-height:1.75">Cada peer tem seu próprio banco SQLite e shards de filesystem independentes. Falha ou reset de um nó não afeta os demais.</div>
@@ -713,7 +708,7 @@
                     <li>✅ TypeScript SDK — 37 testes</li>
                     <li>✅ Go SDK — 64 testes</li>
                     <li>✅ MCP Bridge — 23 testes</li>
-                    <li>✅ Total: <strong>204 testes passando</strong></li>
+                    <li>✅ Total: <strong>216 testes passando</strong></li>
                     <li>✅ FTS5 + porter stemmer + BM25</li>
                     <li>✅ AES-256-GCM (conteúdo privado)</li>
                     <li>✅ Demo cross-session (make demo)</li>
@@ -739,6 +734,8 @@
                     <li>✅ Peers isolados — DB + shards independentes</li>
                     <li>✅ Kernel blackhole auto-ban (escalada 1 min→∞)</li>
                     <li>✅ nginx per-hostname routing (multi-instance)</li>
+                    <li>✅ Peer Discovery — gossip + registry público</li>
+                    <li>✅ <code>/kcp/v1/peers</code> + <code>/peers.json</code></li>
                     <li>☐ Multi-peer replication factor</li>
                     <li>☐ Web dashboard UI</li>
                 </ul>
@@ -801,6 +798,94 @@
         { threshold: 0.12, rootMargin: '0px 0px -60px 0px' }
     );
     document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+</script>
+
+<style>
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+</style>
+
+<script>
+// ── KCP Live Peer Widget ─────────────────────────────────────────────────
+(async function loadPeers() {
+    const grid = document.getElementById('peers-grid');
+    if (!grid) return;
+
+    // Load registry
+    let peers = [];
+    try {
+        const r = await fetch('/peers.json');
+        const data = await r.json();
+        peers = data.peers || [];
+    } catch(e) {
+        grid.innerHTML = '<p style="color:var(--text-muted);font-size:.875rem">Não foi possível carregar o registry de peers.</p>';
+        return;
+    }
+
+    // Render skeleton cards immediately with names
+    grid.innerHTML = peers.map((p, i) => `
+        <div id="peer-card-${i}" style="padding:1.5rem;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-lg);transition:border-color .3s">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <span id="peer-dot-${i}" style="font-size:1.1rem;transition:all .3s">⏳</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+                    <div id="peer-status-${i}" style="font-size:.78rem;color:var(--text-muted)">verificando...</div>
+                </div>
+                <div id="peer-count-${i}" style="font-size:.78rem;color:var(--text-muted);text-align:right"></div>
+            </div>
+            <code style="font-size:.75rem;background:var(--bg-soft);padding:.4rem .75rem;border-radius:6px;display:block;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.url}/kcp/v1/health</code>
+            <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+                <span style="font-size:.72rem;padding:.2rem .5rem;background:var(--bg-soft);border-radius:4px;color:var(--text-muted)">${p.region}</span>
+                <span style="font-size:.72rem;padding:.2rem .5rem;background:var(--bg-soft);border-radius:4px;color:var(--text-muted)">${p.provider}</span>
+                <a href="${p.peers_url}" target="_blank" style="font-size:.72rem;padding:.2rem .5rem;background:var(--blue-soft,#eff6ff);border-radius:4px;color:var(--blue);text-decoration:none">/peers ↗</a>
+            </div>
+        </div>
+    `).join('');
+
+    // Probe each peer in parallel
+    await Promise.allSettled(peers.map(async (p, i) => {
+        const card = document.getElementById(`peer-card-${i}`);
+        const dot = document.getElementById(`peer-dot-${i}`);
+        const statusEl = document.getElementById(`peer-status-${i}`);
+        const countEl = document.getElementById(`peer-count-${i}`);
+        const t0 = Date.now();
+        try {
+            const r = await fetch(p.health_url, { signal: AbortSignal.timeout(7000) });
+            const ms = Date.now() - t0;
+            if (r.ok) {
+                const h = await r.json();
+                dot.textContent = '🟢';
+                statusEl.textContent = `● Live — ${ms}ms`;
+                statusEl.style.color = 'var(--green)';
+                card.style.borderColor = 'var(--green-mid)';
+                if (h.artifacts != null) {
+                    countEl.innerHTML = `<strong style="color:var(--text-2)">${h.artifacts}</strong><br><span style="color:var(--text-muted)">artefatos</span>`;
+                }
+            } else {
+                throw new Error(r.status);
+            }
+        } catch(e) {
+            dot.textContent = '🔴';
+            statusEl.textContent = '● Offline';
+            statusEl.style.color = 'var(--red,#ef4444)';
+            card.style.borderColor = 'var(--red,#ef4444)';
+        }
+    }));
+
+    // Update live count in stats bar
+    const liveCount = document.querySelectorAll('[id^="peer-dot-"]');
+    let live = 0;
+    liveCount.forEach(el => { if (el.textContent === '🟢') live++; });
+    const statEl = document.querySelector('.stat-card .stat-num');
+    // Find the "Peers" stat card
+    document.querySelectorAll('.stat-card').forEach(card => {
+        if (card.querySelector('.stat-lbl')?.textContent?.includes('Peers')) {
+            card.querySelector('.stat-num').textContent = live;
+        }
+    });
+})();
 </script>
 </body>
 </html>

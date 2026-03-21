@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "updated_at": "2026-03-21T00:00:00Z",
+  "protocol": "KCP/1",
+  "registry_url": "https://kcp-protocol.org/peers.json",
+  "peers": [
+    {
+      "node_id": "133aec3e-5bc0-41a7-b2f9-000000000004",
+      "url": "https://peer04.kcp-protocol.org",
+      "name": "KCP Public Peer 04",
+      "region": "BRA",
+      "provider": "DigitalOcean",
+      "health_url": "https://peer04.kcp-protocol.org/kcp/v1/health",
+      "peers_url": "https://peer04.kcp-protocol.org/kcp/v1/peers",
+      "status": "live"
+    },
+    {
+      "node_id": "ea634ee9-fc64-42b8-a3c1-000000000005",
+      "url": "https://peer05.kcp-protocol.org",
+      "name": "KCP Public Peer 05",
+      "region": "BRA",
+      "provider": "DigitalOcean",
+      "health_url": "https://peer05.kcp-protocol.org/kcp/v1/health",
+      "peers_url": "https://peer05.kcp-protocol.org/kcp/v1/peers",
+      "status": "live"
+    },
+    {
+      "node_id": "9aa41716-1761-4fce-b8d2-000000000007",
+      "url": "https://peer07.kcp-protocol.org",
+      "name": "KCP Public Peer 07",
+      "region": "BRA",
+      "provider": "DigitalOcean",
+      "health_url": "https://peer07.kcp-protocol.org/kcp/v1/health",
+      "peers_url": "https://peer07.kcp-protocol.org/kcp/v1/peers",
+      "status": "live"
+    }
+  ]
+}
