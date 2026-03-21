@@ -59,14 +59,14 @@ KCP defines a protocol for **knowledge artifacts** — signed, content-addressed
 
 KCP peers are open nodes anyone can sync with. No account needed.
 
-| Peer | URL | Status | Location |
-|------|-----|--------|----------|
-| peer04 | `https://peer04.kcp-protocol.org` | ✅ Live | DigitalOcean (BRA) |
-| peer05 | `https://peer05.kcp-protocol.org` | ✅ Live | DigitalOcean (BRA) |
-| peer07 | `https://peer07.kcp-protocol.org` | ✅ Live | DigitalOcean (BRA) |
-| peer01 | `https://peer01.kcp-protocol.org` | ⏳ DNS pending | DigitalOcean (BRA) |
-| peer02 | `https://peer02.kcp-protocol.org` | ⏳ DNS pending | DigitalOcean (BRA) |
-| peer03 | `https://peer03.kcp-protocol.org` | ⏳ DNS pending | DigitalOcean (BRA) |
+| Peer | URL | Status | Region |
+|------|-----|--------|--------|
+| peer04 | `https://peer04.kcp-protocol.org` | ✅ Live | South America |
+| peer05 | `https://peer05.kcp-protocol.org` | ✅ Live | South America |
+| peer07 | `https://peer07.kcp-protocol.org` | ✅ Live | South America |
+| peer01 | `https://peer01.kcp-protocol.org` | ⏳ Coming soon | Europe |
+| peer02 | `https://peer02.kcp-protocol.org` | ⏳ Coming soon | North America |
+| peer03 | `https://peer03.kcp-protocol.org` | ⏳ Coming soon | Asia Pacific |
 
 ```bash
 # Check peer health

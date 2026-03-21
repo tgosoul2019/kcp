@@ -64,46 +64,61 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
 
 ### Completed
 
-- [x] VPS deployment (DigitalOcean, Ubuntu 24.04, 165.22.151.182)
-- [x] **3 live peers** — peer04:8804, peer05:8805, peer07:8807 (same VPS, nginx routing)
-- [x] SSL/TLS — Let's Encrypt wildcard cert (peer04/05/07.kcp-protocol.org, valid Jun 2026)
-- [x] nginx per-hostname routing with rate limiting (kcp_general / kcp_sync / kcp_write zones)
-- [x] Kernel blackhole auto-ban daemon (IP abuse → ipset → kernel routing blackhole)
+- [x] Production server deployment (Linux, multi-instance)
+- [x] **3 live peers** — peer04, peer05, peer07 (same host, nginx routing per hostname)
+- [x] SSL/TLS — Let's Encrypt wildcard cert (peer04/05/07.kcp-protocol.org)
+- [x] nginx per-hostname routing with rate limiting (read / sync / write zones)
+- [x] Kernel blackhole auto-ban daemon (IP abuse → automatic network-level block)
 - [x] X-KCP-Client header enforcement on public endpoints
 - [x] Peer discovery API (GET /kcp/v1/peers/discover, gossip, bootstrap via peers.json)
 - [x] docs/peers.json — public peer registry served by GitHub Pages
-- [x] Multi-peer replication factor (store.py kcp_replication table + node.py route + tests)
+- [x] Multi-peer replication factor (kcp_replication table + /replication route + tests)
 - [x] Web dashboard UI (SPA — artifacts, search, publish, peers, sync, replication tabs)
-- [x] Traffic reporter daemon (kcp-traffic-report.py — GitHub API + peer health → email HTML)
-- [x] systemd services for all peers (kcp-peer04/05/07.service)
+- [x] Traffic reporter daemon (peer health + metrics → HTML report)
+- [x] Process manager services for all peers
 
 ---
 
-## Phase 3: Multi-Region Federation (v0.5) 🔜
+## Phase 3: Community Network & One-Click Deploy (v0.5) 🔜
 
-**Goal:** Deploy geographically distributed peers, true P2P federation across providers.
+**Goal:** Enable the community to run its own peers. The KCP project runs reference
+nodes during the proof-of-concept phase, but the long-term model is a **voluntary
+mesh where each operator funds their own node** — exactly like how the web works.
 
-### New Peers (6 total)
+See [RFC KCP-004 — Network Deployment Models](../rfcs/kcp-004-network-models.md)
+for the full network sustainability strategy.
 
-- [ ] **peer01** — Europe (Amsterdam / Frankfurt) — Hetzner or Vultr
-- [ ] **peer02** — Americas (New York / São Paulo) — Linode or DigitalOcean
-- [ ] **peer03** — Asia Pacific (Singapore / Tokyo) — Vultr or DigitalOcean
-- [ ] **peer06** — Africa (Johannesburg) — Hetzner or dedicated provider
+### Network Models
 
-Each peer: independent VPS, own SSL cert, own node_id, full sync mesh.
+KCP defines four deployment modes (RFC KCP-004):
 
-### Tasks
+| Mode | Who operates | Who pays | Public network? |
+|------|-------------|----------|-----------------|
+| **Local** | Individual developer | Nobody (local disk) | No |
+| **Private Hub** | Organization (IT/DevOps) | The organization | No |
+| **Community Peer** | Volunteer operator | The operator | Yes |
+| **Federated Mesh** | Multiple orgs / peers | Each participant | Optional |
 
-- [ ] Provision 4 new VPS (peer01–03, peer06)
+### Phase 3 Tasks — Lower the barrier for community operators
+
+- [ ] One-click deploy guide (Docker Compose, Fly.io, Railway, Render)
+- [ ] Operator documentation (hardware requirements, config reference, ToS template)
 - [ ] Ansible playbook for repeatable peer setup
-- [ ] Cross-region latency benchmarks
-- [ ] Automatic peer health monitoring with alerts
-- [ ] Geographic routing (nearest peer auto-selection)
-- [ ] Multi-region replication health dashboard
+- [ ] `peers.json` submission process (GitHub PR + automated health check CI)
+- [ ] Private hub deployment guide (enterprise Mode 2)
+- [ ] Automatic peer health monitoring
+- [ ] Cross-region latency benchmarks (community-contributed data)
+- [ ] RFC KCP-004 published (network models + sustainability)
+
+### What the KCP project does NOT need to do
+
+- Pay for community-operated nodes — operators fund their own infrastructure
+- Run peer01/02/03/06 ourselves — they should be operated by community members
+- Build a hosting platform — the protocol is MIT-licensed, others can build that
 
 ---
 
-## Phase 4: IPFS & Decentralized Storage (v0.5)
+## Phase 4: IPFS & Decentralized Storage (v0.6)
 
 **Goal:** Content-addressed storage via IPFS for permanent, censorship-resistant artifact persistence.
 

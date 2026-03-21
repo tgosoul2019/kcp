@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KCP Network Status</title>
+<meta name="description" content="Live status of the KCP public peer network. Real-time health checks, latency and component architecture.">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--bg-card:#1e293b;--bg-soft:#152032;
+    --border:#334155;--border-strong:#475569;
+    --blue:#3b82f6;--blue-soft:#1e3a5f;
+    --green:#22c55e;--green-soft:#14532d;
+    --red:#ef4444;--amber:#f59e0b;--purple:#a78bfa;
+    --text:#f1f5f9;--text-2:#94a3b8;--text-3:#475569;
+    --radius:8px;--radius-lg:12px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:'SF Mono','Fira Code',monospace;font-size:.85em;background:var(--bg-soft);padding:.15em .45em;border-radius:3px}
+
+  nav{display:flex;align-items:center;gap:1.5rem;padding:.875rem 2rem;background:var(--bg-card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+  .brand{font-weight:800;font-size:1rem;color:var(--blue);letter-spacing:-.02em;text-decoration:none}
+  .nav-link{font-size:.875rem;color:var(--text-2)}
+  .nav-link:hover{color:var(--text);text-decoration:none}
+  .spacer{flex:1}
+
+  .container{max-width:1080px;margin:0 auto;padding:0 1.5rem}
+  section{padding:3.5rem 0}
+
+  h1{font-size:2rem;font-weight:800;letter-spacing:-.03em;line-height:1.15}
+  h2{font-size:1.4rem;font-weight:700;margin-bottom:1.25rem}
+  .eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin-bottom:.5rem}
+  .sub{color:var(--text-2);font-size:.95rem;margin-top:.5rem;line-height:1.6}
+
+  /* Status banner */
+  .status-banner{display:flex;align-items:center;gap:.75rem;padding:.875rem 1.25rem;border-radius:var(--radius-lg);background:var(--green-soft);border:1px solid var(--green);font-weight:600;font-size:.9rem;margin-bottom:2.5rem}
+  .status-banner.degraded{background:rgba(245,158,11,.1);border-color:var(--amber)}
+  .status-banner.down{background:rgba(239,68,68,.1);border-color:var(--red)}
+  .pulse{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(34,197,94,.4);animation:pulse-ring 1.5s infinite}
+  @keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+
+  /* Peer cards */
+  .peer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:2.5rem}
+  .peer-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;transition:border-color .2s}
+  .peer-card.online{border-color:var(--green)}
+  .peer-card.offline{border-color:var(--red)}
+  .peer-card.checking{border-color:var(--border)}
+  .peer-name{font-weight:700;font-size:1rem;margin-bottom:.25rem}
+  .peer-url{font-size:.8rem;color:var(--text-2);font-family:monospace;margin-bottom:.875rem}
+  .peer-status{display:flex;align-items:center;gap:.5rem;font-size:.85rem;font-weight:600}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot.green{background:var(--green)}
+  .dot.red{background:var(--red)}
+  .dot.amber{background:var(--amber);animation:blink .8s linear infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .peer-meta{margin-top:.875rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+  .peer-meta-item{font-size:.78rem}
+  .peer-meta-item span{color:var(--text-3);display:block;font-size:.72rem;margin-bottom:.1rem}
+
+  /* Architecture diagram */
+  .arch-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;overflow-x:auto}
+  .arch-svg{width:100%;max-width:960px;display:block;margin:0 auto}
+
+  /* Components table */
+  .comp-table{width:100%;border-collapse:collapse}
+  .comp-table th{padding:.625rem 1rem;text-align:left;font-size:.75rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;background:var(--bg-soft);border-bottom:1px solid var(--border)}
+  .comp-table td{padding:.875rem 1rem;font-size:.875rem;border-bottom:1px solid var(--border);vertical-align:top}
+  .comp-table tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:.2rem .6rem;border-radius:4px;font-size:.72rem;font-weight:700}
+  .badge-green{background:var(--green-soft);color:var(--green)}
+  .badge-blue{background:var(--blue-soft);color:var(--blue)}
+  .badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .badge-amber{background:rgba(245,158,11,.12);color:var(--amber)}
+
+  /* Uptime bar */
+  .uptime-row{display:flex;gap:3px;margin-top:.625rem}
+  .uptime-block{width:10px;height:20px;border-radius:2px;background:var(--green)}
+  .uptime-block.miss{background:var(--red)}
+  .uptime-label{font-size:.72rem;color:var(--text-3);margin-top:.25rem}
+
+  footer{padding:2rem;text-align:center;color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="brand">⚛ KCP</a>
+  <a href="/" class="nav-link">← Home</a>
+  <a href="https://github.com/kcp-protocol/kcp" target="_blank" class="nav-link">GitHub</a>
+  <div class="spacer"></div>
+  <span style="font-size:.8rem;color:var(--text-3)">Auto-refresh: 30s</span>
+</nav>
+
+<section>
+  <div class="container">
+    <div class="eyebrow">REDE P2P</div>
+    <h1>Network Status</h1>
+    <p class="sub">Status em tempo real dos peers públicos KCP. Verificado diretamente do seu browser — sem intermediários.</p>
+
+    <!-- Global banner -->
+    <div style="margin-top:1.5rem;margin-bottom:2rem">
+      <div class="status-banner" id="global-banner">
+        <div class="pulse" id="global-dot"></div>
+        <span id="global-msg">Verificando peers…</span>
+        <span style="margin-left:auto;font-size:.78rem;font-weight:400;color:var(--text-2)" id="last-check"></span>
+      </div>
+    </div>
+
+    <!-- Peer cards -->
+    <div class="peer-grid" id="peer-grid">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Architecture diagram -->
+    <h2 style="margin-bottom:1.25rem">Arquitetura da rede</h2>
+    <div class="arch-wrap">
+      <svg class="arch-svg" viewBox="0 0 960 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background regions -->
+        <rect x="10" y="10" width="280" height="500" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+        <rect x="340" y="10" width="280" height="500" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+        <rect x="670" y="10" width="280" height="500" rx="14" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+
+        <!-- Region labels -->
+        <text x="150" y="38" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui" font-weight="700" letter-spacing="1.5">CLIENTE</text>
+        <text x="480" y="38" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui" font-weight="700" letter-spacing="1.5">CAMADA KCP</text>
+        <text x="810" y="38" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui" font-weight="700" letter-spacing="1.5">REDE P2P</text>
+
+        <!-- ===== CLIENTE ===== -->
+        <!-- KCP SDK -->
+        <rect x="35" y="60" width="230" height="60" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="150" y="86" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="700" font-family="system-ui">KCP SDK</text>
+        <text x="150" y="105" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Python · TypeScript · Go</text>
+
+        <!-- MCP Bridge -->
+        <rect x="35" y="150" width="230" height="60" rx="10" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="150" y="176" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="700" font-family="system-ui">MCP Bridge</text>
+        <text x="150" y="195" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Claude · Cursor · Windsurf</text>
+
+        <!-- CLI -->
+        <rect x="35" y="240" width="105" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="87" y="265" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">CLI</text>
+        <text x="87" y="281" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">kcp publish</text>
+
+        <!-- Web UI -->
+        <rect x="160" y="240" width="105" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="212" y="265" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">Web UI</text>
+        <text x="212" y="281" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">/ui dashboard</text>
+
+        <!-- Local storage -->
+        <rect x="35" y="325" width="230" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="150" y="349" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">Armazenamento local</text>
+        <text x="150" y="365" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">SQLite + FTS5 · Filesystem shards</text>
+
+        <!-- Ed25519 -->
+        <rect x="35" y="408" width="108" height="52" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="89" y="431" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">Ed25519</text>
+        <text x="89" y="448" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Assinar · Verificar</text>
+
+        <!-- AES-256-GCM -->
+        <rect x="157" y="408" width="108" height="52" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="211" y="431" text-anchor="middle" fill="#f1f5f9" font-size="11" font-weight="700" font-family="system-ui">AES-256-GCM</text>
+        <text x="211" y="448" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Conteúdo privado</text>
+
+        <!-- ===== CAMADA KCP ===== -->
+        <!-- KCP Node -->
+        <rect x="365" y="60" width="230" height="60" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="2"/>
+        <text x="480" y="86" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="700" font-family="system-ui">KCP Node (HTTP API)</text>
+        <text x="480" y="105" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">FastAPI · REST · /kcp/v1/*</text>
+
+        <!-- Sync Engine -->
+        <rect x="365" y="150" width="230" height="60" rx="10" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="480" y="176" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="700" font-family="system-ui">Sync Engine</text>
+        <text x="480" y="195" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Queue · Retry · Circuit Breaker · ACK</text>
+
+        <!-- ACL Engine -->
+        <rect x="365" y="240" width="109" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="419" y="264" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">ACL Engine</text>
+        <text x="419" y="280" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">public/org/team/private</text>
+
+        <!-- Replication -->
+        <rect x="486" y="240" width="109" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="540" y="264" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">Replication</text>
+        <text x="540" y="280" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Factor · ACK tracking</text>
+
+        <!-- Peer Discovery -->
+        <rect x="365" y="325" width="230" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="480" y="349" text-anchor="middle" fill="#f1f5f9" font-size="13" font-weight="700" font-family="system-ui">Peer Discovery</text>
+        <text x="480" y="365" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Gossip (1 hop) · Bootstrap registry</text>
+
+        <!-- nginx / Security -->
+        <rect x="365" y="408" width="230" height="52" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="480" y="431" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">nginx · TLS · Rate Limit</text>
+        <text x="480" y="448" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">Let's Encrypt · X-KCP-Client · Blackhole</text>
+
+        <!-- ===== REDE P2P ===== -->
+        <!-- Peer node -->
+        <rect x="695" y="60" width="230" height="60" rx="10" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="810" y="86" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="700" font-family="system-ui">Peer Node</text>
+        <text x="810" y="105" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">peer04 · peer05 · peer07</text>
+
+        <!-- Peer 01/02/03 (coming) -->
+        <rect x="695" y="150" width="230" height="60" rx="10" fill="#0f172a" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 3"/>
+        <text x="810" y="176" text-anchor="middle" fill="#475569" font-size="13" font-weight="700" font-family="system-ui">Peer Node (Fase 3)</text>
+        <text x="810" y="195" text-anchor="middle" fill="#475569" font-size="10" font-family="system-ui">peer01 · peer02 · peer03 · peer06</text>
+
+        <!-- Peers.json registry -->
+        <rect x="695" y="240" width="230" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="810" y="264" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">peers.json registry</text>
+        <text x="810" y="280" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">GitHub Pages · kcp-protocol.org/peers.json</text>
+
+        <!-- Health / Status -->
+        <rect x="695" y="325" width="230" height="55" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+        <text x="810" y="349" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="system-ui">Health API</text>
+        <text x="810" y="365" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui">GET /kcp/v1/health · /peers · /replication</text>
+
+        <!-- IPFS (coming) -->
+        <rect x="695" y="408" width="230" height="52" rx="10" fill="#0f172a" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 3"/>
+        <text x="810" y="431" text-anchor="middle" fill="#475569" font-size="12" font-weight="700" font-family="system-ui">IPFS / libp2p (Fase 4)</text>
+        <text x="810" y="448" text-anchor="middle" fill="#475569" font-size="10" font-family="system-ui">CID · Conteúdo permanente</text>
+
+        <!-- ===== ARROWS ===== -->
+        <!-- SDK → Node -->
+        <path d="M265 90 L365 90" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrow-blue)"/>
+        <text x="315" y="84" text-anchor="middle" fill="#3b82f6" font-size="9" font-family="system-ui">HTTPS/REST</text>
+
+        <!-- MCP → Node -->
+        <path d="M265 180 L365 180" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrow-purple)"/>
+        <text x="315" y="174" text-anchor="middle" fill="#a78bfa" font-size="9" font-family="system-ui">MCP tools</text>
+
+        <!-- Node → Sync -->
+        <path d="M480 120 L480 150" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+
+        <!-- Node → ACL -->
+        <path d="M450 120 L419 240" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-gray)"/>
+
+        <!-- Node → Replication -->
+        <path d="M510 120 L540 240" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-gray)"/>
+
+        <!-- Sync → Peer -->
+        <path d="M595 180 L695 180" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+        <text x="645" y="174" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui">ACK sync</text>
+
+        <!-- Node → PeerDiscovery -->
+        <path d="M480 210 L480 325" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-gray)"/>
+
+        <!-- PeerDiscovery → peers.json -->
+        <path d="M595 355 L695 270" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow-gray)"/>
+
+        <!-- Peer → Health -->
+        <path d="M810 120 L810 325" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-gray)"/>
+
+        <!-- Local Store ↔ Node (bidirectional) -->
+        <path d="M265 350 L365 180" stroke="#334155" stroke-width="1" stroke-dasharray="4 3"/>
+
+        <!-- Arrowhead markers -->
+        <defs>
+          <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+          </marker>
+          <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#a78bfa"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+          </marker>
+          <marker id="arrow-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+          </marker>
+          <marker id="arrow-gray" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L7,3 z" fill="#475569"/>
+          </marker>
+        </defs>
+      </svg>
+      <p style="text-align:center;font-size:.78rem;color:var(--text-3);margin-top:1rem">
+        Tracejado = planejado (Fase 3/4) · Sólido = implementado e live
+      </p>
+    </div>
+
+    <!-- Component reference table -->
+    <h2 style="margin-top:3rem;margin-bottom:1.25rem">Componentes do sistema</h2>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Componente</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th>Endpoints / API</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>KCP SDK</strong></td>
+            <td><span class="badge badge-blue">Library</span></td>
+            <td>Biblioteca cliente. Publica, busca, verifica, gerencia lineage. Funciona in-process sem servidor. Python, TypeScript, Go.</td>
+            <td><code>node.publish()</code> <code>node.search()</code> <code>node.lineage()</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>KCP Node (HTTP)</strong></td>
+            <td><span class="badge badge-blue">Server</span></td>
+            <td>API REST que expõe o SDK via HTTP. Permite acesso por outros processos, browsers e peers remotos.</td>
+            <td><code>GET /kcp/v1/artifacts</code> <code>POST /kcp/v1/artifacts</code> <code>GET /kcp/v1/health</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>MCP Bridge</strong></td>
+            <td><span class="badge badge-purple">Bridge</span></td>
+            <td>Expõe o KCP como servidor MCP (Model Context Protocol). Permite que Claude, Cursor e Windsurf publiquem e recuperem artefatos diretamente via tools.</td>
+            <td>MCP tools: <code>kcp_publish</code> <code>kcp_search</code> <code>kcp_get</code> <code>kcp_lineage</code> <code>kcp_list</code> <code>kcp_stats</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Sync Engine</strong></td>
+            <td><span class="badge badge-amber">Background</span></td>
+            <td>Worker que entrega artefatos para peers registrados. Fila SQLite-backed, retry com backoff exponencial, circuit breaker por peer, confirmação por ACK.</td>
+            <td><code>POST /kcp/v1/sync/push</code> <code>GET /kcp/v1/sync/status</code> <code>GET /kcp/v1/sync/list</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Peer Discovery</strong></td>
+            <td><span class="badge badge-blue">Protocol</span></td>
+            <td>Dois mecanismos: bootstrap via <code>peers.json</code> oficial + gossip consultando <code>/kcp/v1/peers</code> de cada peer conhecido (1 hop). Todos os peers descobertos são upsertados localmente.</td>
+            <td><code>GET /kcp/v1/peers</code> <code>POST /kcp/v1/peers</code> <code>GET /kcp/v1/peers/discover</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Replication Tracker</strong></td>
+            <td><span class="badge badge-blue">Protocol</span></td>
+            <td>Rastreia quais peers confirmaram (ACK) recepção de cada artefato. Replication factor configurável. Flag <code>complete</code> quando <code>count ≥ factor</code>.</td>
+            <td><code>GET /kcp/v1/artifacts/{id}/replication</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Web Dashboard</strong></td>
+            <td><span class="badge badge-blue">UI</span></td>
+            <td>SPA vanilla JS servida pelo próprio nó em <code>/ui</code>. Abas: Artifacts, Search, Publish, Peers, Sync, Replication. Sem dependências externas.</td>
+            <td><code>GET /ui</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>ACL Engine</strong></td>
+            <td><span class="badge badge-blue">Security</span></td>
+            <td>Controle de acesso por artefato. Visibilidades: <code>public</code> (todos), <code>org</code> (mesmo tenant), <code>team</code> (lista explícita), <code>private</code> (owner only). Verificado em todos os endpoints.</td>
+            <td>Via headers <code>X-KCP-User-ID</code> <code>X-KCP-Tenant</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Peer Network</strong> (peer04/05/07)</td>
+            <td><span class="badge badge-green">Infrastructure</span></td>
+            <td>3 nós públicos live, cada um com DB e filesystem independentes. TLS via Let's Encrypt. nginx com rate limiting por zona (leitura / sync / escrita).</td>
+            <td><code>https://peer04.kcp-protocol.org</code> <code>peer05</code> <code>peer07</code></td>
+            <td><span class="badge badge-green">✅ Live</span></td>
+          </tr>
+          <tr>
+            <td><strong>Multi-region Peers</strong> (peer01/02/03/06)</td>
+            <td><span class="badge badge-amber">Planned</span></td>
+            <td>Nós em Europa, Américas, Ásia-Pacífico e África. Cada um em host independente com Ansible automatizado.</td>
+            <td>–</td>
+            <td><span class="badge badge-amber">⏳ Fase 3</span></td>
+          </tr>
+          <tr>
+            <td><strong>IPFS Backend</strong></td>
+            <td><span class="badge badge-amber">Planned</span></td>
+            <td>Armazenamento de conteúdo via IPFS. CID-addressed. Artefatos públicos permanentes, resistentes à censura.</td>
+            <td>–</td>
+            <td><span class="badge badge-amber">⏳ Fase 4</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>KCP — Knowledge Context Protocol · <a href="https://github.com/kcp-protocol/kcp">github.com/kcp-protocol/kcp</a> · Open Source (MIT)</p>
+    <p style="margin-top:.375rem">Status verificado no seu browser via <code>fetch()</code> direto aos peers — zero backend intermediário.</p>
+  </div>
+</footer>
+
+<script>
+const PEERS_JSON = '/peers.json';
+
+async function loadPeers() {
+  const grid = document.getElementById('peer-grid');
+  let peers = [];
+
+  // Try to load from peers.json registry
+  try {
+    const r = await fetch(PEERS_JSON);
+    const data = await r.json();
+    peers = (data.peers || []).filter(p => p.url);
+  } catch(e) {
+    // Fallback: hardcoded live peers
+    peers = [
+      { name: 'peer04', url: 'https://peer04.kcp-protocol.org', region: 'South America' },
+      { name: 'peer05', url: 'https://peer05.kcp-protocol.org', region: 'South America' },
+      { name: 'peer07', url: 'https://peer07.kcp-protocol.org', region: 'South America' },
+    ];
+  }
+
+  // Render skeleton cards
+  grid.innerHTML = peers.map((p, i) => `
+    <div class="peer-card checking" id="card-${i}">
+      <div class="peer-name">${esc(p.name || p.url.replace('https://',''))}</div>
+      <div class="peer-url">${esc(p.url)}</div>
+      <div class="peer-status">
+        <div class="dot amber" id="dot-${i}"></div>
+        <span id="status-${i}">Verificando…</span>
+      </div>
+      <div class="peer-meta" id="meta-${i}"></div>
+      <div style="margin-top:.875rem">
+        <a href="${esc(p.url)}/kcp/v1/health" target="_blank" style="font-size:.75rem;color:var(--blue)">Health ↗</a>
+        <span style="color:var(--border);margin:0 .4rem">·</span>
+        <a href="${esc(p.url)}/ui" target="_blank" style="font-size:.75rem;color:var(--blue)">Dashboard ↗</a>
+        ${p.peers_url ? `<span style="color:var(--border);margin:0 .4rem">·</span><a href="${esc(p.peers_url)}" target="_blank" style="font-size:.75rem;color:var(--blue)">/peers ↗</a>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  // Check each peer
+  let onlineCount = 0;
+  await Promise.allSettled(peers.map(async (p, i) => {
+    const card = document.getElementById(`card-${i}`);
+    const dot = document.getElementById(`dot-${i}`);
+    const statusEl = document.getElementById(`status-${i}`);
+    const metaEl = document.getElementById(`meta-${i}`);
+    const start = Date.now();
+    try {
+      const r = await fetch(`${p.url}/kcp/v1/health`, { signal: AbortSignal.timeout(8000) });
+      const ms = Date.now() - start;
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      onlineCount++;
+      card.classList.remove('checking');
+      card.classList.add('online');
+      dot.className = 'dot green';
+      statusEl.textContent = `● Online — ${ms}ms`;
+      statusEl.style.color = 'var(--green)';
+      metaEl.innerHTML = `
+        <div class="peer-meta-item"><span>Artefatos</span>${data.artifacts ?? '—'}</div>
+        <div class="peer-meta-item"><span>Peers</span>${data.peers ?? '—'}</div>
+        <div class="peer-meta-item"><span>Versão</span>${esc(data.kcp_version ?? '—')}</div>
+        <div class="peer-meta-item"><span>Região</span>${esc(p.region ?? '—')}</div>
+      `;
+    } catch(e) {
+      card.classList.remove('checking');
+      card.classList.add('offline');
+      dot.className = 'dot red';
+      statusEl.textContent = '● Offline';
+      statusEl.style.color = 'var(--red)';
+    }
+  }));
+
+  // Update global banner
+  updateBanner(onlineCount, peers.length);
+  document.getElementById('last-check').textContent = `Atualizado ${new Date().toLocaleTimeString('pt-BR')}`;
+}
+
+function updateBanner(online, total) {
+  const banner = document.getElementById('global-banner');
+  const dot = document.getElementById('global-dot');
+  const msg = document.getElementById('global-msg');
+  if (online === total) {
+    banner.className = 'status-banner';
+    dot.style.background = 'var(--green)';
+    msg.textContent = `Todos os sistemas operacionais — ${online}/${total} peers online`;
+  } else if (online > 0) {
+    banner.className = 'status-banner degraded';
+    dot.style.background = 'var(--amber)';
+    dot.style.animation = 'none';
+    msg.textContent = `Degradado — ${online}/${total} peers online`;
+  } else {
+    banner.className = 'status-banner down';
+    dot.style.background = 'var(--red)';
+    dot.style.animation = 'none';
+    msg.textContent = `Todos os peers offline — verificar conectividade`;
+  }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+
+loadPeers();
+// Auto-refresh every 30s
+setInterval(loadPeers, 30000);
+</script>
+</body>
+</html>
