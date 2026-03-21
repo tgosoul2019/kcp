@@ -524,16 +524,20 @@ class LocalStore:
     # ─── Sync ──────────────────────────────────────────────────
 
     def get_artifact_ids_since(self, since: Optional[str] = None) -> list[str]:
-        """Get artifact IDs created after a given timestamp (for sync)."""
+        """Get artifact IDs created after a given timestamp (for sync).
+        Only returns public artifacts — private/org/team are never synced.
+        """
         conn = self._get_conn()
         if since:
             rows = conn.execute(
-                "SELECT id FROM kcp_artifacts WHERE created_at > ? AND deleted_at IS NULL ORDER BY created_at",
+                "SELECT id FROM kcp_artifacts WHERE created_at > ? AND deleted_at IS NULL "
+                "AND visibility = 'public' ORDER BY created_at",
                 (since,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id FROM kcp_artifacts WHERE deleted_at IS NULL ORDER BY created_at"
+                "SELECT id FROM kcp_artifacts WHERE deleted_at IS NULL "
+                "AND visibility = 'public' ORDER BY created_at"
             ).fetchall()
         return [r["id"] for r in rows]
 

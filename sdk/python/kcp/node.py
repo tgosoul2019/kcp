@@ -305,34 +305,87 @@ class KCPNode:
     def create_app(self):
         """Create FastAPI app for HTTP serving (P2P + Web UI)."""
         try:
-            from fastapi import FastAPI, HTTPException
+            from fastapi import FastAPI, HTTPException, Request, Header, Depends
             from fastapi.responses import HTMLResponse, JSONResponse
         except ImportError:
             raise ImportError("FastAPI required for HTTP serving. pip install fastapi uvicorn")
 
         app = FastAPI(title="KCP Node", version="0.1.0")
 
+        def _caller_identity(
+            x_kcp_user_id: Optional[str] = Header(default=None, alias="X-KCP-User-ID"),
+            x_kcp_tenant: Optional[str] = Header(default=None, alias="X-KCP-Tenant"),
+        ) -> tuple:
+            """Extract caller identity from request headers."""
+            return (
+                x_kcp_user_id or self.user_id,
+                x_kcp_tenant or self.tenant_id,
+            )
+
+        def _can_read(artifact, caller_user: str, caller_tenant: str) -> bool:
+            """
+            ACL enforcement rules:
+              public  → everyone
+              org     → same tenant_id only
+              team    → in ACL.allowed_users OR in ACL.allowed_teams (future)
+              private → owner (user_id) only
+            """
+            v = artifact.visibility
+            if v == "public":
+                return True
+            if v == "org":
+                return artifact.tenant_id == caller_tenant
+            if v == "team":
+                if artifact.acl is None:
+                    return artifact.tenant_id == caller_tenant
+                if caller_user in (artifact.acl.allowed_users or []):
+                    return True
+                return False
+            if v == "private":
+                return artifact.user_id == caller_user
+            return False
+
         @app.get("/kcp/v1/health")
         def health():
             return self.public_stats()
 
         @app.get("/kcp/v1/artifacts")
-        def list_artifacts(limit: int = 50, q: Optional[str] = None, tags: Optional[str] = None):
-            if q:
-                return self.search(q, limit=limit).__dict__
+        def list_artifacts(
+            limit: int = 50,
+            q: Optional[str] = None,
+            tags: Optional[str] = None,
+            caller: tuple = Depends(_caller_identity),
+        ):
+            caller_user, caller_tenant = caller
             tag_list = tags.split(",") if tags else None
+            if q:
+                resp = self.search(q, limit=limit)
+                visible = [r for r in resp.results if (a := self.get(r.id)) and _can_read(a, caller_user, caller_tenant)]
+                resp.results = visible
+                resp.total = len(visible)
+                return resp.__dict__
             artifacts = self.list(limit=limit, tags=tag_list)
-            return {"artifacts": [a.to_dict() for a in artifacts], "total": len(artifacts)}
+            visible = [a for a in artifacts if _can_read(a, caller_user, caller_tenant)]
+            return {"artifacts": [a.to_dict() for a in visible], "total": len(visible)}
 
         @app.get("/kcp/v1/artifacts/{artifact_id}")
-        def get_artifact(artifact_id: str):
+        def get_artifact(artifact_id: str, caller: tuple = Depends(_caller_identity)):
+            caller_user, caller_tenant = caller
             a = self.get(artifact_id)
             if not a:
                 raise HTTPException(404, "Artifact not found")
+            if not _can_read(a, caller_user, caller_tenant):
+                raise HTTPException(403, "Access denied")
             return a.to_dict()
 
         @app.get("/kcp/v1/artifacts/{artifact_id}/content")
-        def get_content(artifact_id: str):
+        def get_content(artifact_id: str, caller: tuple = Depends(_caller_identity)):
+            caller_user, caller_tenant = caller
+            a = self.get(artifact_id)
+            if not a:
+                raise HTTPException(404, "Content not found")
+            if not _can_read(a, caller_user, caller_tenant):
+                raise HTTPException(403, "Access denied")
             content = self.get_content(artifact_id)
             if content is None:
                 raise HTTPException(404, "Content not found")

@@ -481,3 +481,128 @@ class TestNodeSync:
         assert node_b.get(a1.id) is not None
         assert node_b.get(a2.id) is not None
         assert node_b.get(a1.id).title == "Alpha"
+
+
+# ─── ACL Enforcement ─────────────────────────────────────────
+
+
+class TestACLEnforcement:
+    """Tests for visibility-based access control on HTTP endpoints."""
+
+    @pytest.fixture
+    def acl_node(self, tmp_path):
+        """Node with artifacts of different visibility levels."""
+        node = KCPNode(
+            user_id="owner@acme.com",
+            tenant_id="acme",
+            db_path=str(tmp_path / "acl.db"),
+            keys_dir=str(tmp_path / "keys"),
+        )
+        node.publish(title="Public Doc", content="everyone sees this", format="text", visibility="public")
+        node.publish(title="Org Doc", content="acme org only", format="text", visibility="org")
+        node.publish(title="Private Doc", content="owner only", format="text", visibility="private")
+        return node
+
+    def test_public_visible_to_anonymous(self, acl_node):
+        """public artifacts appear with no auth headers."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts")
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Public Doc" in titles
+
+    def test_org_visible_to_same_tenant(self, acl_node):
+        """org artifacts visible when X-KCP-Tenant matches."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts", headers={
+            "X-KCP-User-ID": "colleague@acme.com",
+            "X-KCP-Tenant": "acme",
+        })
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Org Doc" in titles
+
+    def test_org_hidden_from_other_tenant(self, acl_node):
+        """org artifacts NOT visible to different tenant."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts", headers={
+            "X-KCP-User-ID": "stranger@rival.com",
+            "X-KCP-Tenant": "rival",
+        })
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Org Doc" not in titles
+
+    def test_private_visible_to_owner(self, acl_node):
+        """private artifacts visible only to the owner."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts", headers={
+            "X-KCP-User-ID": "owner@acme.com",
+            "X-KCP-Tenant": "acme",
+        })
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Private Doc" in titles
+
+    def test_private_hidden_from_other_user(self, acl_node):
+        """private artifacts NOT visible to other users, even same tenant."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts", headers={
+            "X-KCP-User-ID": "colleague@acme.com",
+            "X-KCP-Tenant": "acme",
+        })
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Private Doc" not in titles
+
+    def test_get_private_by_id_returns_403(self, acl_node):
+        """GET /artifacts/{id} returns 403 for private artifact by non-owner."""
+        client = TestClient(acl_node.create_app())
+        # Find the private artifact ID
+        all_ids = [a.id for a in acl_node.list()]
+        private_id = next(a.id for a in acl_node.list() if a.visibility == "private")
+        resp = client.get(f"/kcp/v1/artifacts/{private_id}", headers={
+            "X-KCP-User-ID": "intruder@acme.com",
+            "X-KCP-Tenant": "acme",
+        })
+        assert resp.status_code == 403
+
+    def test_get_org_by_id_returns_403_wrong_tenant(self, acl_node):
+        """GET /artifacts/{id} returns 403 for org artifact from wrong tenant."""
+        client = TestClient(acl_node.create_app())
+        org_id = next(a.id for a in acl_node.list() if a.visibility == "org")
+        resp = client.get(f"/kcp/v1/artifacts/{org_id}", headers={
+            "X-KCP-Tenant": "other-org",
+        })
+        assert resp.status_code == 403
+
+    def test_anonymous_sees_only_public(self, acl_node):
+        """With no headers, only public artifacts are returned."""
+        # Override node identity to be 'anonymous' (no matching tenant/user)
+        from kcp.node import KCPNode
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmp:
+            viewer = KCPNode(
+                user_id="anon@external.com",
+                tenant_id="external",
+                db_path=os.path.join(tmp, "v.db"),
+                keys_dir=os.path.join(tmp, "k"),
+            )
+        # Use acl_node app but send external headers
+        client = TestClient(acl_node.create_app())
+        resp = client.get("/kcp/v1/artifacts", headers={
+            "X-KCP-User-ID": "anon@external.com",
+            "X-KCP-Tenant": "external",
+        })
+        titles = [a["title"] for a in resp.json()["artifacts"]]
+        assert "Public Doc" in titles
+        assert "Org Doc" not in titles
+        assert "Private Doc" not in titles
+
+    def test_sync_list_excludes_private(self, acl_node):
+        """Sync endpoints should never expose private artifacts."""
+        client = TestClient(acl_node.create_app())
+        resp = client.get(
+            "/kcp/v1/sync/list",
+            headers={"X-KCP-Client": "kcp-test/1.0"},
+        )
+        ids = resp.json()["ids"]
+        # Private artifact should not be in sync list
+        private_ids = [a.id for a in acl_node.list() if a.visibility == "private"]
+        for pid in private_ids:
+            assert pid not in ids
