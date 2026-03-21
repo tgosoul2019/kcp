@@ -574,10 +574,13 @@ class LocalStore:
         ).fetchone()
         if existing:
             conn.execute(
-                "UPDATE kcp_peers SET name = COALESCE(NULLIF(?, ''), name), "
-                "last_seen = ?, public_key = COALESCE(NULLIF(?, ''), public_key) "
+                "UPDATE kcp_peers SET "
+                "name = COALESCE(NULLIF(?, ''), name), "
+                "id = COALESCE(NULLIF(?, ''), id), "
+                "last_seen = ?, "
+                "public_key = COALESCE(NULLIF(?, ''), public_key) "
                 "WHERE url = ?",
-                (name, now, public_key, url),
+                (name, node_id, now, public_key, url),
             )
         else:
             import uuid
