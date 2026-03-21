@@ -206,6 +206,7 @@
             <a href="#problem" class="nav-link">Problema</a>
             <a href="#protocol" class="nav-link">Protocolo</a>
             <a href="#sdks" class="nav-link">SDKs</a>
+            <a href="#mcp" class="nav-link">MCP</a>
             <a href="#peers" class="nav-link">Peers</a>
             <a href="#roadmap" class="nav-link">Roadmap</a>
             <a href="https://github.com/kcp-protocol/kcp" target="_blank" class="nav-cta">⭐ GitHub</a>
@@ -405,6 +406,188 @@
     </div>
 </section>
 
+<!-- MCP BRIDGE — linguagem humana → método -->
+<section id="mcp" style="background:var(--bg-soft)">
+    <div class="container">
+        <div class="sec-eyebrow fade-up">MCP BRIDGE</div>
+        <h2 class="fade-up">Fale com o KCP em linguagem natural</h2>
+        <p class="sec-desc fade-up">
+            O KCP expõe um servidor MCP (<em>Model Context Protocol</em>) que qualquer agente de IA — Claude, Cursor, Windsurf, GPT — pode chamar diretamente.
+            Você escreve em linguagem humana; o agente traduz para o método técnico correto.
+        </p>
+
+        <!-- Como funciona em 3 passos -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin:2.5rem 0 3rem" class="fade-up">
+            <div style="padding:1.5rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);text-align:center">
+                <div style="font-size:2rem;margin-bottom:.75rem">💬</div>
+                <div style="font-weight:700;margin-bottom:.375rem">1. Você escreve</div>
+                <div style="font-size:.875rem;color:var(--text-muted)">"Salva essa análise sobre autenticação JWT"</div>
+            </div>
+            <div style="padding:1.5rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);text-align:center">
+                <div style="font-size:2rem;margin-bottom:.75rem">🤖</div>
+                <div style="font-weight:700;margin-bottom:.375rem">2. O agente traduz</div>
+                <div style="font-size:.875rem;color:var(--text-muted)"><code>kcp_publish(title=..., content=..., tags=[...])</code></div>
+            </div>
+            <div style="padding:1.5rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);text-align:center">
+                <div style="font-size:2rem;margin-bottom:.75rem">🔐</div>
+                <div style="font-weight:700;margin-bottom:.375rem">3. KCP persiste</div>
+                <div style="font-size:.875rem;color:var(--text-muted)">Artefato assinado, indexado, pronto para busca e sync</div>
+            </div>
+        </div>
+
+        <!-- Tabela linguagem humana → método técnico -->
+        <h3 class="fade-up" style="font-size:1.25rem;font-weight:700;margin-bottom:1.25rem">
+            O que você pode pedir — e o que acontece por baixo
+        </h3>
+        <div class="table-wrap fade-up" style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+                <thead>
+                    <tr style="background:var(--bg-soft)">
+                        <th style="padding:.875rem 1rem;text-align:left;border-bottom:2px solid var(--border);width:38%">O que você diz ao agente</th>
+                        <th style="padding:.875rem 1rem;text-align:left;border-bottom:2px solid var(--border);width:22%">Método MCP</th>
+                        <th style="padding:.875rem 1rem;text-align:left;border-bottom:2px solid var(--border)">O que acontece</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"Salva essa análise sobre rate limiting"</em><br>
+                            <em style="color:var(--text-2)">"Guarda isso para eu usar depois"</em><br>
+                            <em style="color:var(--text-2)">"Persiste esse documento como privado"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--purple-soft);color:var(--purple);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_publish</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Artefato criado, assinado com Ed25519, hash SHA-256 calculado, indexado no FTS5, enfileirado para sync com peers</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);background:var(--bg-soft)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"O que eu já sei sobre autenticação?"</em><br>
+                            <em style="color:var(--text-2)">"Tem algo salvo sobre deploy no k8s?"</em><br>
+                            <em style="color:var(--text-2)">"Busca decisões de arquitetura anteriores"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--blue-soft);color:var(--blue);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_search</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Busca FTS5 full-text com BM25 ranking + porter stemmer. Retorna top-N com score de relevância em &lt;5ms</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"Me mostra o conteúdo completo daquele artifact"</em><br>
+                            <em style="color:var(--text-2)">"Lê o documento com ID abc-123"</em><br>
+                            <em style="color:var(--text-2)">"Qual era a conclusão daquela análise?"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--green-soft);color:var(--green);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_get</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Recupera metadados + conteúdo completo. Descriptografa automaticamente artefatos privados se o node tem a chave</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);background:var(--bg-soft)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"De onde veio essa análise? Qual foi a origem?"</em><br>
+                            <em style="color:var(--text-2)">"Mostra a cadeia de derivação desse documento"</em><br>
+                            <em style="color:var(--text-2)">"Como esse relatório foi construído?"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--amber-soft);color:var(--amber);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_lineage</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Percorre o DAG de derivação do root até o artefato atual. Mostra cada etapa: fonte → rascunho → análise → decisão</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"Lista o que foi salvo esta semana"</em><br>
+                            <em style="color:var(--text-2)">"Mostra os últimos documentos com tag 'infra'"</em><br>
+                            <em style="color:var(--text-2)">"Quais artifacts existem aqui?"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--green-soft);color:var(--green);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_list</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Lista artefatos recentes com filtro por tags. Retorna título, formato, visibilidade e timestamp</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);background:var(--bg-soft)">
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"Quantos artifacts estão salvos?"</em><br>
+                            <em style="color:var(--text-2)">"Qual é o node ID desse KCP?"</em><br>
+                            <em style="color:var(--text-2)">"Me dá um relatório do estado do sistema"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--bg-card);color:var(--text-2);padding:.2em .5em;border-radius:4px;font-size:.85em;border:1px solid var(--border)">kcp_stats</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Contagem de artefatos, tamanho do banco, node_id, versão do protocolo, lista de tools disponíveis</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:.875rem 1rem">
+                            <em style="color:var(--text-2)">"O sync está funcionando com os peers?"</em><br>
+                            <em style="color:var(--text-2)">"Tem algum artefato que falhou ao sincronizar?"</em><br>
+                            <em style="color:var(--text-2)">"Qual o estado da fila de entrega?"</em>
+                        </td>
+                        <td style="padding:.875rem 1rem"><code style="background:var(--blue-soft);color:var(--blue);padding:.2em .5em;border-radius:4px;font-size:.85em">kcp_sync_status</code></td>
+                        <td style="padding:.875rem 1rem;color:var(--text-muted);font-size:.875rem">Estado do SyncWorker + circuit breaker por peer + fila: pending / in_flight / done / failed com contagens</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Exemplo real de conversa -->
+        <div style="margin-top:3rem" class="fade-up">
+            <h3 style="font-size:1.15rem;font-weight:700;margin-bottom:1.25rem">Exemplo de conversa real com Claude + KCP</h3>
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+                <!-- Mensagem usuário 1 -->
+                <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">EU</div>
+                    <div style="font-size:.9rem;padding-top:.25rem">Acabei de analisar por que o nosso sistema de pagamento cai sob carga. Salva isso como <strong>"Root cause — timeout cascata no checkout"</strong>, com tags pagamentos e infra.</div>
+                </div>
+                <!-- Resposta agente 1 -->
+                <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);background:var(--purple-soft);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">AI</div>
+                    <div style="font-size:.875rem;padding-top:.25rem">
+                        Chamando <code style="background:rgba(124,58,237,.12);color:var(--purple);padding:.15em .4em;border-radius:3px">kcp_publish</code> →
+                        <span style="color:var(--green);font-weight:600">✅ Artefato salvo</span>
+                        <span style="color:var(--text-muted)"> · ID: <code>a3f7c...</code> · Ed25519 assinado · enfileirado para sync com peer07</span>
+                    </div>
+                </div>
+                <!-- Mensagem usuário 2 -->
+                <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">EU</div>
+                    <div style="font-size:.9rem;padding-top:.25rem">Semana que vem outro engenheiro vai investigar o mesmo problema. Como ele vai encontrar o que eu documentei?</div>
+                </div>
+                <!-- Resposta agente 2 -->
+                <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);background:var(--purple-soft);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">AI</div>
+                    <div style="font-size:.875rem;padding-top:.25rem">
+                        Ele usa <code style="background:rgba(124,58,237,.12);color:var(--purple);padding:.15em .4em;border-radius:3px">kcp_search("timeout pagamento checkout")</code> — o FTS5 com BM25 retorna seu artefato como resultado mais relevante em &lt;5ms, mesmo sem saber o título exato.
+                    </div>
+                </div>
+                <!-- Mensagem usuário 3 -->
+                <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">EU</div>
+                    <div style="font-size:.9rem;padding-top:.25rem">Três semanas depois ele fez um relatório de capacidade baseado nessa análise. Conseguimos rastrear isso?</div>
+                </div>
+                <!-- Resposta agente 3 -->
+                <div style="padding:1rem 1.5rem;background:var(--purple-soft);display:flex;gap:1rem;align-items:flex-start">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0">AI</div>
+                    <div style="font-size:.875rem;padding-top:.25rem">
+                        Sim. <code style="background:rgba(124,58,237,.12);color:var(--purple);padding:.15em .4em;border-radius:3px">kcp_lineage("id-do-relatório")</code> retorna a cadeia completa:
+                        <br><br>
+                        <code style="font-size:.82em;color:var(--text-2);line-height:1.8">
+                            Root cause (você, Mar/21) → Relatório de capacidade (eng2, Abr/11)
+                        </code>
+                        <br>
+                        <span style="color:var(--text-muted)">Assinaturas válidas em cada etapa. Rastreabilidade completa para auditoria.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup rápido -->
+        <div style="margin-top:2.5rem;padding:1.5rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)" class="fade-up">
+            <div style="font-weight:700;margin-bottom:.875rem">⚡ Ativar o MCP Bridge no seu editor</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem;font-size:.875rem">
+                <div style="padding:.875rem 1rem;background:var(--bg-soft);border-radius:var(--radius)">
+                    <div style="font-weight:600;margin-bottom:.375rem">Claude Desktop</div>
+                    <code style="color:var(--text-muted)">make setup-mcp-claude</code>
+                </div>
+                <div style="padding:.875rem 1rem;background:var(--bg-soft);border-radius:var(--radius)">
+                    <div style="font-weight:600;margin-bottom:.375rem">Cursor / Windsurf</div>
+                    <code style="color:var(--text-muted)">make setup-mcp</code>
+                </div>
+                <div style="padding:.875rem 1rem;background:var(--bg-soft);border-radius:var(--radius)">
+                    <div style="font-weight:600;margin-bottom:.375rem">Qualquer editor MCP</div>
+                    <code style="color:var(--text-muted)">pip install kcp && kcp-mcp-server</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- COMPARAÇÃO -->
 <section id="comparison">
     <div class="container">
@@ -515,11 +698,11 @@
                 <h3 style="color:var(--green)">✅ Fase 1 — MVP</h3>
                 <ul>
                     <li>✅ Spec do protocolo v0.2</li>
-                    <li>✅ Python SDK — 122 testes</li>
+                    <li>✅ Python SDK — 131 testes</li>
                     <li>✅ TypeScript SDK — 37 testes</li>
                     <li>✅ Go SDK — 64 testes</li>
                     <li>✅ MCP Bridge — 23 testes</li>
-                    <li>✅ Total: 246 testes passando</li>
+                    <li>✅ Total: <strong>174 testes passando</strong></li>
                     <li>✅ FTS5 + porter stemmer + BM25</li>
                     <li>✅ AES-256-GCM (conteúdo privado)</li>
                     <li>✅ Demo cross-session (make demo)</li>
@@ -527,31 +710,37 @@
                     <li>✅ Setup automático para Claude/Cursor/Windsurf</li>
                 </ul>
             </div>
-            <div class="roadmap-card fade-up d2" style="border-color:var(--blue-mid)">
-                <h3 style="color:var(--blue)">🔵 Fase 2 — Escala</h3>
+            <div class="roadmap-card fade-up d2" style="border-color:var(--blue-mid);background:var(--blue-soft)">
+                <h3 style="color:var(--blue)">🔵 Fase 2 — Sync &amp; Resiliência</h3>
                 <ul>
-                    <li>✅ Lineage tracking</li>
-                    <li>✅ Multi-tenant ACL</li>
-                    <li>✅ MCP Bridge (RFC KCP-002)</li>
-                    <li>✅ Peer público live (peer04/05/07)</li>
-                    <li>✅ HTTP server + sync API (35 testes)</li>
-                    <li>✅ AES-256-GCM encryption</li>
+                    <li>✅ Lineage tracking + multi-tenant ACL</li>
+                    <li>✅ MCP Bridge — RFC KCP-002</li>
+                    <li>✅ Peers públicos live (peer04/05/07)</li>
+                    <li>✅ HTTP server + sync API</li>
+                    <li>✅ AES-256-GCM + Ed25519</li>
                     <li>✅ FTS5 full-content + stemming + BM25</li>
-                    <li>☐ Semantic search (vector DB)</li>
-                    <li>☐ Artifact TTL + versioning</li>
-                    <li>☐ Rust + Java + Kotlin SDKs</li>
+                    <li>✅ RFC KCP-003 — Sync Engine</li>
+                    <li>✅ Async sync + adaptive batching</li>
+                    <li>✅ Circuit breaker por peer</li>
+                    <li>✅ Delivery confirmation (ACK)</li>
+                    <li>✅ Exponential backoff retry</li>
+                    <li>🔄 Hybrid storage (SQLite + filesystem) <em style="font-size:.8em;color:var(--blue)">[em progresso]</em></li>
+                    <li>☐ Multi-peer replication factor</li>
                     <li>☐ Web dashboard UI</li>
-                    <li>☐ 100 early adopters</li>
                 </ul>
             </div>
             <div class="roadmap-card fade-up d3">
                 <h3 style="color:var(--text-2)">⚪ Fase 3 — Padrão</h3>
                 <ul>
+                    <li>☐ Semantic search (vector embeddings)</li>
+                    <li>☐ Artifact TTL + versioning</li>
+                    <li>☐ Rust + Java + Kotlin SDKs</li>
                     <li>☐ peer01–06 ativos (multi-região)</li>
                     <li>☐ IPFS + libp2p (P2P nativo)</li>
                     <li>☐ KCP Native Format (.kcp)</li>
                     <li>☐ RFC submetido (IETF)</li>
                     <li>☐ Paper no ArXiv</li>
+                    <li>☐ 100 early adopters</li>
                     <li>☐ Comunidade global</li>
                 </ul>
             </div>
