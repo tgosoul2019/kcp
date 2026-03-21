@@ -65,6 +65,7 @@ class KCPNode:
         raw_peers = os.environ.get("KCP_PEERS", "")
         self.peers: list[str] = [p.strip() for p in raw_peers.split(",") if p.strip()]
         self._sync_worker: Optional[SyncWorker] = None
+        self._port: int = 0  # set by serve(); used by network-status for localhost probing
         if self.peers:
             self._sync_worker = SyncWorker(self.store, self.peers)
             self._sync_worker.start()
@@ -648,27 +649,41 @@ class KCPNode:
             import urllib.error
             import time
 
-            # Build probe list: self + all known peers
+            # Build probe list: self (via localhost) + all known peers
             known = self.store.get_peers()
             self_url = self._self_url()
-            probe_urls: list[dict] = [{"url": self_url, "name": "self"}]
+            self_public_url = self_url  # used for display only
+
+            # Probe self via localhost if port is known (no DNS needed)
+            self_probe_url = self_public_url
+            if hasattr(self, '_port') and self._port:
+                self_probe_url = f"http://127.0.0.1:{self._port}"
+
+            probe_urls: list[dict] = []
+            if self_probe_url:
+                probe_urls.append({
+                    "url": self_probe_url,
+                    "display_url": self_public_url or self_probe_url,
+                    "name": "self",
+                })
             for p in known:
                 u = p.get("url", "").rstrip("/")
                 if u and u != self_url.rstrip("/"):
-                    probe_urls.append({"url": u, "name": p.get("name", "")})
+                    probe_urls.append({"url": u, "display_url": u, "name": p.get("name", "")})
 
             results = []
             for entry in probe_urls:
-                url = entry["url"].rstrip("/") + "/kcp/v1/health"
+                probe_url = entry["url"].rstrip("/") + "/kcp/v1/health"
+                display_url = entry.get("display_url", entry["url"])
                 t0 = time.monotonic()
                 try:
-                    req = urllib.request.Request(url, headers={"User-Agent": "kcp-network-status/1.0"})
+                    req = urllib.request.Request(probe_url, headers={"User-Agent": "kcp-network-status/1.0"})
                     with urllib.request.urlopen(req, timeout=5) as resp:
                         ms = int((time.monotonic() - t0) * 1000)
                         data = json.loads(resp.read().decode())
                         results.append({
                             "name": entry["name"],
-                            "url": entry["url"],
+                            "url": display_url,
                             "status": "online",
                             "latency_ms": ms,
                             "node_id": data.get("node_id", ""),
@@ -680,7 +695,7 @@ class KCPNode:
                     ms = int((time.monotonic() - t0) * 1000)
                     results.append({
                         "name": entry["name"],
-                        "url": entry["url"],
+                        "url": display_url,
                         "status": "offline",
                         "latency_ms": ms,
                         "error": str(e)[:120],
@@ -713,6 +728,7 @@ class KCPNode:
         except ImportError:
             raise ImportError("uvicorn required. pip install uvicorn")
 
+        self._port = port  # stored so network-status can probe self via localhost
         app = self.create_app()
         print(f"🌐 KCP Node serving at http://{host}:{port}")
         print(f"📡 Web UI: http://localhost:{port}/ui")
