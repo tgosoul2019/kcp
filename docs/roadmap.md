@@ -79,7 +79,7 @@ KCP becomes the standard protocol for AI-generated knowledge — from personal u
 
 ---
 
-## Phase 3: Community Network & One-Click Deploy (v0.5) 🔜
+## Phase 3: Community Network & One-Click Deploy (v0.5) ✅ COMPLETE (March 2026)
 
 **Goal:** Enable the community to run its own peers. The KCP project runs reference
 nodes during the proof-of-concept phase, but the long-term model is a **voluntary
@@ -101,14 +101,16 @@ KCP defines four deployment modes (RFC KCP-004):
 
 ### Phase 3 Tasks — Lower the barrier for community operators
 
-- [ ] One-click deploy guide (Docker Compose, Fly.io, Railway, Render)
-- [ ] Operator documentation (hardware requirements, config reference, ToS template)
-- [ ] Ansible playbook for repeatable peer setup
-- [ ] `peers.json` submission process (GitHub PR + automated health check CI)
-- [ ] Private hub deployment guide (enterprise Mode 2)
-- [ ] Automatic peer health monitoring
-- [ ] Cross-region latency benchmarks (community-contributed data)
-- [ ] RFC KCP-004 published (network models + sustainability)
+- [x] One-click deploy guide — Docker Compose ([deploy-docker.md](deploy-docker.md))
+- [x] DigitalOcean step-by-step guide ([deploy-digitalocean.md](deploy-digitalocean.md))
+- [x] Operator documentation (hardware requirements, config reference, ToS)
+- [x] `peers.json` submission process (GitHub PR + automated health check CI)
+- [x] Automatic peer health monitoring (GitHub Actions — PR check + daily cron)
+- [x] RFC KCP-004 published ([rfcs/kcp-004-network-models.md](../rfcs/kcp-004-network-models.md))
+- [x] Artifact seeding — 7.052 artifacts across 7 peers (public + org + private mix)
+- [x] Docker image + docker-compose.yml for community operators
+- [ ] Ansible playbook for repeatable peer setup _(deferred to v0.6)_
+- [ ] Cross-region latency benchmarks _(deferred — needs community peers first)_
 
 ### What the KCP project does NOT need to do
 

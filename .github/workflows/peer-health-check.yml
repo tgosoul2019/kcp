@@ -1,0 +1,272 @@
+name: Peer Health Check
+
+on:
+  pull_request:
+    paths:
+      - 'docs/peers.json'
+  # Also run daily to detect peers that went offline
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # On PRs: check only the NEW/MODIFIED peers in the diff
+  # ─────────────────────────────────────────────────────────────────────────
+  check-pr-peers:
+    name: Check new peers in PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Extract added/modified peers from diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          python3 - <<'PYEOF'
+          import subprocess, json, sys
+
+          # Get old and new versions of peers.json
+          base = subprocess.run(
+              ['git', 'show', f'origin/${{ github.base_ref }}:docs/peers.json'],
+              capture_output=True, text=True
+          )
+          try:
+              old_peers = {p['url']: p for p in json.loads(base.stdout).get('peers', [])}
+          except Exception:
+              old_peers = {}
+
+          with open('docs/peers.json') as f:
+              new_data = json.load(f)
+          new_peers = {p['url']: p for p in new_data.get('peers', [])}
+
+          # Find added or changed peers
+          added = []
+          for url, peer in new_peers.items():
+              if url not in old_peers:
+                  added.append(peer)
+              elif peer != old_peers[url]:
+                  added.append(peer)
+
+          if not added:
+              print("No new or modified peers found in this PR.")
+              with open('/tmp/peers_to_check.json', 'w') as f:
+                  json.dump([], f)
+          else:
+              print(f"Found {len(added)} peer(s) to check:")
+              for p in added:
+                  print(f"  - {p['url']}")
+              with open('/tmp/peers_to_check.json', 'w') as f:
+                  json.dump(added, f)
+          PYEOF
+
+      - name: Health check new peers
+        run: |
+          python3 - <<'PYEOF'
+          import json, urllib.request, urllib.error, sys, time
+
+          with open('/tmp/peers_to_check.json') as f:
+              peers = json.load(f)
+
+          if not peers:
+              print("✅ No peers to check.")
+              sys.exit(0)
+
+          REQUIRED_FIELDS = ['status', 'node_id', 'kcp_version']
+          failures = []
+
+          for peer in peers:
+              name = peer.get('name', peer['url'])
+              health_url = peer.get('health_url', peer['url'] + '/kcp/v1/health')
+              print(f"\n🔍 Checking {name}")
+              print(f"   URL: {health_url}")
+
+              # Try up to 3 times with 5s delay
+              success = False
+              for attempt in range(1, 4):
+                  try:
+                      req = urllib.request.Request(health_url, headers={'User-Agent': 'kcp-ci-health-check/1.0'})
+                      with urllib.request.urlopen(req, timeout=10) as resp:
+                          if resp.status != 200:
+                              raise Exception(f"HTTP {resp.status}")
+                          data = json.loads(resp.read())
+
+                      # Validate required fields
+                      missing = [f for f in REQUIRED_FIELDS if f not in data]
+                      if missing:
+                          raise Exception(f"Missing fields: {missing}")
+
+                      if data.get('status') != 'ok':
+                          raise Exception(f"status is '{data.get('status')}', expected 'ok'")
+
+                      # Validate node_id matches peers.json
+                      if peer.get('node_id') and data.get('node_id') != peer['node_id']:
+                          raise Exception(
+                              f"node_id mismatch: peers.json has '{peer['node_id']}' "
+                              f"but health endpoint returned '{data.get('node_id')}'"
+                          )
+
+                      print(f"   ✅ OK — node_id={data['node_id']}, "
+                            f"kcp_version={data['kcp_version']}, "
+                            f"artifacts={data.get('artifacts', '?')}, "
+                            f"peers={data.get('peers', '?')}")
+                      success = True
+                      break
+
+                  except Exception as e:
+                      print(f"   ⚠️  Attempt {attempt}/3 failed: {e}")
+                      if attempt < 3:
+                          time.sleep(5)
+
+              if not success:
+                  failures.append(f"{name} ({health_url})")
+
+          if failures:
+              print(f"\n❌ {len(failures)} peer(s) failed health check:")
+              for f in failures:
+                  print(f"   - {f}")
+              print("\nPlease ensure your peer is running and reachable before submitting.")
+              sys.exit(1)
+          else:
+              print(f"\n✅ All {len(peers)} peer(s) passed health check!")
+          PYEOF
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Daily: check ALL peers in peers.json, open issue if any are down
+  # ─────────────────────────────────────────────────────────────────────────
+  check-all-peers-daily:
+    name: Daily network health check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check all peers
+        id: health
+        run: |
+          python3 - <<'PYEOF'
+          import json, urllib.request, sys, time, os
+
+          with open('docs/peers.json') as f:
+              data = json.load(f)
+
+          peers = [p for p in data.get('peers', []) if p.get('status') == 'live']
+          print(f"Checking {len(peers)} live peers...\n")
+
+          results = []
+          for peer in peers:
+              name = peer.get('name', peer['url'])
+              health_url = peer.get('health_url', peer['url'] + '/kcp/v1/health')
+              try:
+                  req = urllib.request.Request(health_url, headers={'User-Agent': 'kcp-ci-health-check/1.0'})
+                  t0 = time.monotonic()
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      latency = int((time.monotonic() - t0) * 1000)
+                      body = json.loads(resp.read())
+                  status = body.get('status', '?')
+                  version = body.get('kcp_version', '?')
+                  artifacts = body.get('artifacts', '?')
+                  print(f"  ✅ {name} — {latency}ms — v{version} — {artifacts} artifacts")
+                  results.append({'peer': name, 'url': peer['url'], 'ok': True, 'latency': latency, 'version': version, 'artifacts': artifacts})
+              except Exception as e:
+                  print(f"  ❌ {name} — FAILED: {e}")
+                  results.append({'peer': name, 'url': peer['url'], 'ok': False, 'error': str(e)})
+
+          failed = [r for r in results if not r['ok']]
+          online = len(results) - len(failed)
+
+          summary = f"**KCP Network Health** — {online}/{len(results)} peers online"
+          print(f"\n{summary}")
+
+          # Write summary for GitHub Actions job summary
+          with open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'w') as f:
+              f.write(f"# {summary}\n\n")
+              f.write("| Peer | Status | Latency | Version | Artifacts |\n")
+              f.write("|------|--------|---------|---------|----------|\n")
+              for r in results:
+                  if r['ok']:
+                      f.write(f"| {r['peer']} | ✅ Online | {r['latency']}ms | {r['version']} | {r['artifacts']} |\n")
+                  else:
+                      f.write(f"| {r['peer']} | ❌ Offline | — | — | — |\n")
+
+          if failed:
+              # Signal to next step that there are failures
+              with open('/tmp/failed_peers.json', 'w') as f:
+                  json.dump(failed, f)
+              print(f"\n⚠️  {len(failed)} peer(s) offline")
+              sys.exit(0)  # Don't fail CI — just report
+          else:
+              print("\n🎉 All peers healthy!")
+          PYEOF
+
+      - name: Create issue for offline peers (if any)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/failed_peers.json';
+
+            if (!fs.existsSync(path)) {
+              console.log('No offline peers — nothing to report.');
+              return;
+            }
+
+            const failed = JSON.parse(fs.readFileSync(path, 'utf8'));
+            if (!failed.length) return;
+
+            const today = new Date().toISOString().split('T')[0];
+            const title = `[Network Alert] ${failed.length} peer(s) offline — ${today}`;
+
+            // Check if an open issue with the same title already exists
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'peer-health',
+            });
+
+            const alreadyOpen = existing.data.some(i => i.title.startsWith('[Network Alert]') && i.title.includes(today));
+            if (alreadyOpen) {
+              console.log('Issue already exists for today — skipping.');
+              return;
+            }
+
+            const body = [
+              `## KCP Network Health Alert`,
+              ``,
+              `The daily health check detected **${failed.length} offline peer(s)**:`,
+              ``,
+              ...failed.map(p => `- ❌ **${p.peer}** — ${p.url}\n  Error: \`${p.error}\``),
+              ``,
+              `### Action required`,
+              `- If you are the operator: please check your peer and restore service.`,
+              `- If the peer has been offline for 7+ days: it will be moved to \`status: "offline"\` in peers.json.`,
+              ``,
+              `_This issue was opened automatically by the daily health check CI._`,
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['peer-health'],
+            });
+
+            console.log(`Created issue: ${title}`);
