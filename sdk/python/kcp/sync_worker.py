@@ -229,6 +229,10 @@ class SyncWorker:
             # Peer returned accepted=True or accepted=False (duplicate/invalid)
             # Both count as delivery — no retry needed
             self.store.ack_sync(queue_id)
+            
+            # Record replication ACK (peer confirmed receipt)
+            self.store.record_replication_ack(artifact_id, peer_url)
+            
             if circuit:
                 circuit.record_success()
 

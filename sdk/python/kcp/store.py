@@ -968,6 +968,21 @@ class LocalStore:
             "count": len(rows),
         }
 
+    def record_replication_ack(self, artifact_id: str, peer_url: str):
+        """
+        Record that a peer has acknowledged receiving this artifact.
+        Called by:
+        - SyncWorker after successful push
+        - sync_receive endpoint when receiving from another peer
+        """
+        conn = self._get_conn()
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT OR REPLACE INTO kcp_replication (artifact_id, peer_url, acked_at) VALUES (?, ?, ?)",
+            (artifact_id, peer_url, now),
+        )
+        conn.commit()
+
     def get_replication_summary(self) -> dict:
         """Return replication counts per artifact (useful for dashboard)."""
         conn = self._get_conn()

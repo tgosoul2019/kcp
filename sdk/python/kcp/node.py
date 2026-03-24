@@ -586,8 +586,23 @@ class KCPNode:
 
         @app.post("/kcp/v1/sync/push")
         def sync_receive(body: dict):
+            """
+            Receive artifact from another peer via sync.
+            Records replication ACK.
+            """
             artifact_id = body.get("id", "")
             is_new = self.store.import_artifact(body)
+            
+            # Record replication ACK (sender identified via user_id in payload)
+            if artifact_id:
+                try:
+                    # Use peer's user_id from payload as identifier
+                    sender_id = body.get("user_id", "unknown")
+                    self.store.record_replication_ack(artifact_id, sender_id)
+                except Exception:
+                    # Don't fail sync if ACK recording fails
+                    pass
+            
             return {"accepted": is_new, "id": artifact_id}
 
         # Peers — discovery & registry
