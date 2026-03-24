@@ -113,6 +113,7 @@ textarea { min-height: 150px; resize: vertical; font-family: 'JetBrains Mono', m
     <button class="tab" data-tab="peers">🔗 Peers</button>
     <button class="tab" data-tab="sync">🔄 Sync</button>
     <button class="tab" data-tab="replication">📡 Replication</button>
+    <button class="tab" data-tab="ip-monitor">🔍 IP Monitor</button>
     <button class="tab" data-tab="about">ℹ️ About</button>
   </div>
 
@@ -234,6 +235,17 @@ textarea { min-height: 150px; resize: vertical; font-family: 'JetBrains Mono', m
     </div>
   </div>
 
+  <!-- IP Monitor Panel -->
+  <div class="panel" id="panel-ip-monitor">
+    <div class="card" style="padding:0;overflow:hidden;border-radius:var(--radius);">
+      <iframe id="ip-monitor-frame" style="width:100%;height:calc(100vh - 200px);border:none;background:var(--bg);" loading="lazy"></iframe>
+    </div>
+    <p style="text-align:center;margin-top:12px;font-size:0.8em;color:var(--muted)">
+      Real-time nginx log analysis · Auto-refresh every 10 seconds ·
+      <a href="/ip-monitor" target="_blank" style="color:var(--accent2)">Open in full screen ↗</a>
+    </p>
+  </div>
+
   <!-- About Panel -->
   <div class="panel" id="panel-about">
     <div class="card">
@@ -278,6 +290,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'replication') loadReplication();
     if (tab.dataset.tab === 'peers') loadPeers();
     if (tab.dataset.tab === 'artifacts') loadArtifacts();
+    if (tab.dataset.tab === 'ip-monitor') loadIPMonitor();
   });
 });
 
@@ -547,6 +560,17 @@ async function loadReplication() {
       </tr>`;
     }).join('');
   } catch(e) {}
+}
+
+// ─── IP Monitor (lazy iframe) ──────────────────────────────
+let ipMonitorLoaded = false;
+function loadIPMonitor() {
+  if (ipMonitorLoaded) return;
+  const frame = document.getElementById('ip-monitor-frame');
+  // Build the IP Monitor URL relative to the portal
+  const base = window.location.origin;
+  frame.src = base + '/ip-monitor';
+  ipMonitorLoaded = true;
 }
 
 // Init
