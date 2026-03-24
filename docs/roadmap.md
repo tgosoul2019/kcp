@@ -116,19 +116,25 @@ KCP defines four deployment modes (RFC KCP-004):
 
 ---
 
-## Phase 4: Ecosystem & Adoption 🔜 TARGET: May 2026
+## Phase 4: Ecosystem & Adoption ✅ COMPLETE (March 2026)
 
 **Goal:** Make KCP easy to adopt — PyPI/npm packages, GitHub Action, OpenAPI spec, live network status.
 
-### Tasks
+### Completed
 
-- [ ] **PyPI package** (`pip install kcp`) — automated publish on release
-- [ ] **npm package** (`npm install @kcp/client`) — automated publish on release
-- [ ] **OpenAPI spec** (docs/openapi.yaml) — full HTTP API documentation
-- [ ] **GitHub Action** — publish artifacts from CI/CD workflows
-- [ ] **Live network status API** — real-time peer health via CORS-enabled endpoint
-- [ ] **VS Code extension** — KCP explorer sidebar
-- [ ] **Helm chart** — Kubernetes deployment
+- [x] **OpenAPI spec** (docs/openapi.yaml) — full HTTP API documentation
+- [x] **GitHub Action** — publish artifacts from CI/CD workflows
+- [x] **PyPI workflow** — automated publish on release (trusted publishing)
+- [x] **npm workflow** — automated publish on release with provenance
+- [x] **CORS middleware** — /kcp/v1/network-status accessible from browser
+- [x] **FastAPI version bump** — 0.1.0 → 0.2.0
+
+### Ready for release
+
+- [ ] **PyPI package** (`pip install kcp`) — workflow ready, awaiting first release
+- [ ] **npm package** (`npm install @kcp/client`) — workflow ready, awaiting first release
+- [ ] **VS Code extension** — planned for v0.6
+- [ ] **Helm chart** — planned for v0.6
 
 ### Deferred to v1.0 (Long-term Vision)
 
