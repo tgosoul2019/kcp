@@ -440,11 +440,20 @@ class KCPNode:
         """Create FastAPI app for HTTP serving (P2P + Web UI)."""
         try:
             from fastapi import FastAPI, HTTPException, Request, Header, Depends
+            from fastapi.middleware.cors import CORSMiddleware
             from fastapi.responses import HTMLResponse, JSONResponse
         except ImportError:
             raise ImportError("FastAPI required for HTTP serving. pip install fastapi uvicorn")
 
-        app = FastAPI(title="KCP Node", version="0.1.0")
+        app = FastAPI(title="KCP Node", version="0.2.0")
+        
+        # Enable CORS for /kcp/v1/network-status (browser fetch from kcp-protocol.org)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["https://kcp-protocol.org", "http://localhost:*"],
+            allow_methods=["GET"],
+            allow_headers=["*"],
+        )
 
         def _caller_identity(
             x_kcp_user_id: Optional[str] = Header(default=None, alias="X-KCP-User-ID"),

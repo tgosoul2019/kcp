@@ -1,0 +1,537 @@
+openapi: 3.1.0
+info:
+  title: KCP API
+  version: 0.2.0
+  description: |
+    Knowledge Context Protocol (KCP) HTTP API for peer-to-peer knowledge sharing.
+    
+    This API enables:
+    - Publishing and retrieving knowledge artifacts
+    - Full-text search across artifacts
+    - Lineage tracking (derivedFrom chains)
+    - Peer discovery and sync
+    - Multi-tenant ACL enforcement
+    
+    See full spec: https://github.com/kcp-protocol/kcp/blob/main/SPEC.md
+  license:
+    name: MIT
+    url: https://github.com/kcp-protocol/kcp/blob/main/LICENSE
+  contact:
+    name: KCP Protocol
+    url: https://kcp-protocol.org
+servers:
+  - url: https://peer01.kcp-protocol.org
+    description: Production peer 01
+  - url: https://peer02.kcp-protocol.org
+    description: Production peer 02
+  - url: http://localhost:8800
+    description: Local development
+
+paths:
+  /kcp/v1/health:
+    get:
+      summary: Health check
+      description: Returns node health status, artifact count, and peer count
+      operationId: getHealth
+      responses:
+        '200':
+          description: Node is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, node_id, artifacts, peers, kcp_version, protocol]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  node_id:
+                    type: string
+                    format: uuid
+                  artifacts:
+                    type: integer
+                  peers:
+                    type: integer
+                  kcp_version:
+                    type: string
+                  protocol:
+                    type: string
+
+  /kcp/v1/artifacts:
+    get:
+      summary: Search artifacts
+      description: Full-text search with optional filters by tenant, team, tags, date range
+      operationId: searchArtifacts
+      parameters:
+        - name: q
+          in: query
+          description: Search query (BM25 full-text)
+          schema:
+            type: string
+        - name: tenant_id
+          in: query
+          description: Filter by tenant
+          schema:
+            type: string
+        - name: team
+          in: query
+          description: Filter by team
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: Comma-separated tags
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Max results
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Artifact'
+                  total:
+                    type: integer
+    
+    post:
+      summary: Publish artifact
+      description: Create a new knowledge artifact
+      operationId: publishArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                format:
+                  type: string
+                  enum: [markdown, text, json, html, csv, yaml]
+                  default: text
+                tags:
+                  type: array
+                  items:
+                    type: string
+                summary:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [public, org, team, private]
+                  default: private
+                source:
+                  type: string
+                derived_from:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Artifact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+
+  /kcp/v1/artifacts/{artifact_id}:
+    get:
+      summary: Get artifact metadata
+      operationId: getArtifact
+      parameters:
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Artifact metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+        '404':
+          description: Artifact not found
+
+  /kcp/v1/artifacts/{artifact_id}/content:
+    get:
+      summary: Get artifact content
+      operationId: getArtifactContent
+      parameters:
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Artifact content
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Artifact not found
+
+  /kcp/v1/artifacts/{artifact_id}/lineage:
+    get:
+      summary: Get artifact lineage
+      description: Returns derivedFrom chain (ancestors and descendants)
+      operationId: getArtifactLineage
+      parameters:
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lineage graph
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifact_id:
+                    type: string
+                    format: uuid
+                  ancestors:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+                  descendants:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+
+  /kcp/v1/artifacts/{artifact_id}/replication:
+    get:
+      summary: Get replication status
+      description: Shows which peers have acknowledged this artifact
+      operationId: getReplicationStatus
+      parameters:
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Replication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artifact_id:
+                    type: string
+                    format: uuid
+                  peer_count:
+                    type: integer
+                  complete:
+                    type: boolean
+                  peers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        peer_id:
+                          type: string
+                          format: uuid
+                        url:
+                          type: string
+                        acked_at:
+                          type: string
+                          format: date-time
+
+  /kcp/v1/peers:
+    get:
+      summary: List known peers
+      description: Returns all peers this node knows about (gossip + bootstrap)
+      operationId: listPeers
+      responses:
+        '200':
+          description: Peer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Peer'
+                  total:
+                    type: integer
+                  node_id:
+                    type: string
+                    format: uuid
+    
+    post:
+      summary: Register peer manually
+      description: Add a peer by URL
+      operationId: registerPeer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Peer registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peer_id:
+                    type: string
+
+  /kcp/v1/peers/announce:
+    post:
+      summary: Peer announces itself
+      description: A peer announces itself to this node (triggers gossip)
+      operationId: announcePeer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                node_id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                public_key:
+                  type: string
+      responses:
+        '200':
+          description: Announcement accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: boolean
+                  node_id:
+                    type: string
+                    format: uuid
+
+  /kcp/v1/network-status:
+    get:
+      summary: Network-wide health check
+      description: Server-side aggregation of all known peers' health
+      operationId: getNetworkStatus
+      responses:
+        '200':
+          description: Network status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  self:
+                    $ref: '#/components/schemas/PeerHealth'
+                  peers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PeerHealth'
+                  total_artifacts:
+                    type: integer
+                  total_peers:
+                    type: integer
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /kcp/v1/sync/list:
+    get:
+      summary: List sync queue
+      description: Returns pending/in-flight/failed sync operations
+      operationId: listSyncQueue
+      responses:
+        '200':
+          description: Sync queue status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pending:
+                    type: integer
+                  in_flight:
+                    type: integer
+                  done:
+                    type: integer
+                  failed:
+                    type: integer
+
+  /kcp/v1/sync/push:
+    post:
+      summary: Push artifact to peer
+      description: Sync engine endpoint (requires X-KCP-Client header)
+      operationId: syncPush
+      security:
+        - KCPClient: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Artifact'
+      responses:
+        '200':
+          description: Artifact accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: boolean
+                  artifact_id:
+                    type: string
+                    format: uuid
+
+components:
+  schemas:
+    Artifact:
+      type: object
+      required: [id, title, content_hash, user_id, tenant_id, created_at, signature]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content_hash:
+          type: string
+        format:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+        visibility:
+          type: string
+          enum: [public, org, team, private]
+        user_id:
+          type: string
+        tenant_id:
+          type: string
+        team:
+          type: string
+        source:
+          type: string
+        derived_from:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        signature:
+          type: string
+        public_key:
+          type: string
+    
+    Peer:
+      type: object
+      properties:
+        node_id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        name:
+          type: string
+        region:
+          type: string
+        health_url:
+          type: string
+          format: uri
+        peers_url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [live, offline]
+    
+    PeerHealth:
+      type: object
+      properties:
+        url:
+          type: string
+        status:
+          type: string
+          enum: [ok, timeout, error]
+        artifacts:
+          type: integer
+        peers:
+          type: integer
+        latency_ms:
+          type: number
+        error:
+          type: string
+
+  securitySchemes:
+    KCPClient:
+      type: apiKey
+      in: header
+      name: X-KCP-Client
+      description: Required for sync operations (rate limiting)

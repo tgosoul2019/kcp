@@ -1,0 +1,101 @@
+name: 'KCP Publish Artifact'
+description: 'Publish knowledge artifacts to a KCP peer from CI/CD'
+author: 'KCP Protocol'
+
+branding:
+  icon: 'upload-cloud'
+  color: 'blue'
+
+inputs:
+  peer_url:
+    description: 'KCP peer URL (e.g., https://peer01.kcp-protocol.org)'
+    required: true
+  title:
+    description: 'Artifact title'
+    required: true
+  content:
+    description: 'Artifact content (markdown, text, json, etc.)'
+    required: true
+  format:
+    description: 'Content format (markdown, text, json, html, csv, yaml)'
+    required: false
+    default: 'text'
+  tags:
+    description: 'Comma-separated tags'
+    required: false
+    default: ''
+  visibility:
+    description: 'Visibility tier (public, org, team, private)'
+    required: false
+    default: 'public'
+  source:
+    description: 'Source identifier (e.g., github-actions, ci/cd)'
+    required: false
+    default: 'github-actions'
+
+outputs:
+  artifact_id:
+    description: 'Published artifact ID (UUID)'
+    value: ${{ steps.publish.outputs.artifact_id }}
+  artifact_url:
+    description: 'Full artifact URL'
+    value: ${{ steps.publish.outputs.artifact_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Publish to KCP
+      id: publish
+      shell: bash
+      env:
+        PEER_URL: ${{ inputs.peer_url }}
+        TITLE: ${{ inputs.title }}
+        CONTENT: ${{ inputs.content }}
+        FORMAT: ${{ inputs.format }}
+        TAGS: ${{ inputs.tags }}
+        VISIBILITY: ${{ inputs.visibility }}
+        SOURCE: ${{ inputs.source }}
+      run: |
+        # Build payload
+        TAGS_JSON=$(echo "$TAGS" | jq -R 'split(",") | map(select(length > 0))')
+        
+        PAYLOAD=$(jq -n \
+          --arg title "$TITLE" \
+          --arg content "$CONTENT" \
+          --arg format "$FORMAT" \
+          --argjson tags "$TAGS_JSON" \
+          --arg visibility "$VISIBILITY" \
+          --arg source "$SOURCE" \
+          '{
+            title: $title,
+            content: $content,
+            format: $format,
+            tags: $tags,
+            visibility: $visibility,
+            source: $source
+          }')
+        
+        # POST to peer
+        RESPONSE=$(curl -s -w "\n%{http_code}" \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -H "X-KCP-Client: github-actions" \
+          -d "$PAYLOAD" \
+          "$PEER_URL/kcp/v1/artifacts")
+        
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        
+        if [ "$HTTP_CODE" != "201" ]; then
+          echo "❌ Failed to publish artifact (HTTP $HTTP_CODE)"
+          echo "$BODY"
+          exit 1
+        fi
+        
+        ARTIFACT_ID=$(echo "$BODY" | jq -r '.id')
+        ARTIFACT_URL="$PEER_URL/kcp/v1/artifacts/$ARTIFACT_ID"
+        
+        echo "artifact_id=$ARTIFACT_ID" >> $GITHUB_OUTPUT
+        echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+        
+        echo "✅ Published: $ARTIFACT_URL"

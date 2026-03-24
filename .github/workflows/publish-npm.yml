@@ -1,0 +1,51 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no publish)'
+        required: false
+        default: 'true'
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # npm provenance
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        working-directory: sdk/typescript
+        run: npm ci
+      
+      - name: Run tests
+        working-directory: sdk/typescript
+        run: npm test
+      
+      - name: Build
+        working-directory: sdk/typescript
+        run: npm run build
+      
+      - name: Dry run
+        if: github.event.inputs.dry_run == 'true'
+        working-directory: sdk/typescript
+        run: npm pack --dry-run
+      
+      - name: Publish to npm (production)
+        if: github.event_name == 'release' && github.event.inputs.dry_run != 'true'
+        working-directory: sdk/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
